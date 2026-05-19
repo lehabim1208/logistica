@@ -65,7 +65,7 @@ REGLAS CRUCIALES (INCUMPLIRLAS ES UN ERROR CRÍTICO):
 Texto financiero o extra:
 ${financialText}
 
-Punto de Inicio Fijo: ${userLocation ? \`Ubicación GPS: ${userLocation.lat}, ${userLocation.lng}\` : "Ubicación actual del repartidor"}.
+Punto de Inicio Fijo: ${userLocation ? "Ubicación GPS: " + userLocation.lat + ", " + userLocation.lng : "Ubicación actual del repartidor"}.
 
 IMPERATIVO Y CRÍTICO: 
 - Debes generar ÚNICA y EXACTAMENTE ${imagesBase64.length} elementos en el array "orders" en total. UNA ORDEN POR IMAGEN. NI UNA MÁS, NI UNA MENOS.
