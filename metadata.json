@@ -1,0 +1,11 @@
+{
+  "name": "LogiRuta AI",
+  "description": "Sistema PWA inteligente para optimizar rutas de entrega. Extrae datos de imágenes de facturas y texto para generar viajes con Google Maps.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
