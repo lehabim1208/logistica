@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'motion/react';
+import { dbLocal } from './lib/dbLocal';
 import { HomeView } from './components/HomeView';
 import { InputView } from './components/InputView';
 import { ReviewView } from './components/ReviewView';
@@ -43,6 +45,39 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      // Update UI notify the user they can install the PWA
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    // Optionally, send analytics event with outcome of user choice
+    console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
+    setIsInstallable(false);
+  };
+
   const [routeInfo, setRouteInfo] = useState<ProcessingResult | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -183,6 +218,12 @@ export default function App() {
       description
     };
     setFundHistory(prev => [entry, ...prev]);
+    
+    // Add to offline sync queue
+    dbLocal.addToQueue({
+      type: 'fund_change',
+      data: entry
+    }).catch(console.error);
   };
 
   const handleRouteProcessed = (newRouteInfo: ProcessingResult) => {
@@ -206,234 +247,237 @@ export default function App() {
         <Toaster position="top-center" />
         
         {/* Header / Nav */}
-        {appState !== 'home' && (
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10 transition-colors duration-300">
-          <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setAppState('input')}>
-              <div className="bg-blue-600 p-2 rounded-xl text-white">
-                <Package className="w-5 h-5" />
-              </div>
-              <span className="font-bold text-xl tracking-tight text-gray-900 dark:text-white hidden sm:block">LogiRuta<span className="text-blue-600 dark:text-blue-400">.</span></span>
-              <div className="ml-2 flex items-center justify-center relative w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" title={!isOnline ? "Trabajando sin conexión" : isReconnecting ? "Reconectando..." : "Conectado"}>
-                {!isOnline ? (
-                   <>
-                     <CloudOff className="w-4 h-4 text-red-500 relative z-0" />
-                     <X className="w-3 h-3 text-red-600 absolute bottom-1 right-1 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
-                   </>
-                ) : isReconnecting ? (
-                   <>
-                     <Cloud className="w-4 h-4 text-blue-500 relative z-0" />
-                     <Loader2 className="w-3 h-3 text-blue-600 absolute bottom-1 right-1 bg-white dark:bg-gray-800 rounded-full animate-spin" strokeWidth={3} />
-                   </>
-                ) : (
-                   <>
-                     <Cloud className="w-4 h-4 text-green-500 relative z-0" />
-                     <Check className="w-3 h-3 text-green-600 absolute bottom-1 right-1 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
-                   </>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <div 
-                className="flex items-center gap-2 mr-2 cursor-pointer bg-green-50 dark:bg-green-900/30 px-3 py-1.5 rounded-lg border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
-                onClick={() => setShowFundModal(true)}
-              >
-                <Wallet className="w-4 h-4 text-green-600 dark:text-green-400" />
-                <span className="font-bold text-green-700 dark:text-green-400 text-sm">
-                  ${totalFund.toFixed(2)}
-                </span>
+        <AnimatePresence>
+          {appState !== 'home' && (
+            <motion.header 
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-300"
+            >
+              <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between gap-1.5 overflow-x-hidden">
+                <div className="flex items-center gap-2 cursor-default shrink-0">
+                  <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-500/20">
+                    <Package className="w-4.5 h-4.5" />
+                  </div>
+                  <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white hidden xs:block">LogiRuta<span className="text-blue-600 dark:text-blue-400">.</span></span>
+                  <div className="ml-1 flex items-center justify-center relative w-7 h-7 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700" title={!isOnline ? "Trabajando sin conexión" : isReconnecting ? "Reconectando..." : "Conectado"}>
+                    {!isOnline ? (
+                       <>
+                         <CloudOff className="w-3.5 h-3.5 text-red-500 relative z-0" />
+                         <X className="w-2.5 h-2.5 text-red-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
+                       </>
+                    ) : isReconnecting ? (
+                       <>
+                         <Cloud className="w-3.5 h-3.5 text-blue-500 relative z-0" />
+                         <Loader2 className="w-2.5 h-2.5 text-blue-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full animate-spin" strokeWidth={3} />
+                       </>
+                    ) : (
+                       <>
+                         <Cloud className="w-3.5 h-3.5 text-green-500 relative z-0" />
+                         <Check className="w-2.5 h-2.5 text-green-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
+                       </>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-1.5 overflow-hidden">
+                  <div 
+                    className="flex items-center gap-1.5 cursor-pointer bg-green-50 dark:bg-green-900/30 px-2.5 py-1.5 rounded-xl border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-900/50 transition-all active:scale-95 shrink-0"
+                    onClick={() => setShowFundModal(true)}
+                  >
+                    <Wallet className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <span className="font-bold text-green-700 dark:text-green-400 text-xs sm:text-sm">
+                      ${totalFund.toFixed(0)}
+                    </span>
+                  </div>
+                  
+                  <div 
+                     className="flex items-center gap-1 cursor-pointer bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-green-900/40 transition-all active:scale-95 shrink-0"
+                     onClick={() => { setTpvInput(tpvNumber); setShowTpvModal(true); }}
+                     title="Editar TPV"
+                  >
+                     <span className="text-[10px] font-black text-blue-800 dark:text-blue-400 uppercase tracking-tighter hidden sm:inline">TPV</span>
+                     <span className="font-bold text-blue-700 dark:text-blue-400 text-xs sm:text-sm">{tpvNumber || '--'}</span>
+                  </div>
+    
+                  <button 
+                    onClick={() => {
+                      setPendingPhotoFn(null); 
+                      setShowCameraModal(true);
+                    }}
+                    className="p-1.5 sm:p-2 text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-xl transition-all active:scale-95 flex items-center justify-center border border-blue-200 dark:border-blue-800/50 shrink-0"
+                    title="Cámara"
+                  >
+                    <Camera className="w-4.5 h-4.5" />
+                  </button>
+    
+                  <button 
+                    onClick={() => setShowSettingsModal(true)}
+                    className="p-1.5 sm:p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-xl transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
+                    aria-label="Ajustes"
+                  >
+                    <Settings className="w-4.5 h-4.5" />
+                  </button>
+                  
+                  {appState === 'input' && (
+                    <button 
+                      onClick={() => setShowHistoryModal(true)}
+                      className="p-1.5 sm:p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-xl transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
+                      aria-label="Ver historial"
+                    >
+                      <History className="w-4.5 h-4.5" />
+                    </button>
+                  )}
+                </div>
               </div>
               
-              <div 
-                 className="flex items-center gap-1.5 mr-2 cursor-pointer bg-blue-50 dark:bg-blue-900/30 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-                 onClick={() => { setTpvInput(tpvNumber); setShowTpvModal(true); }}
-                 title="Editar TPV"
-              >
-                 <span className="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase tracking-widest hidden sm:inline">TPV</span>
-                 <span className="font-bold text-blue-700 dark:text-blue-400 text-sm">{tpvNumber || '--'}</span>
+              {/* Mobile bottom tools bar */}
+              <div className="flex sm:hidden justify-center items-center py-2 gap-3 px-4 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
+                 <button 
+                    onClick={() => setShowNotesModal(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 flex-1 text-sm font-bold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl border border-sky-200/50 dark:border-sky-800/30 transition-all active:scale-95"
+                  >
+                    <StickyNote className="w-4.5 h-4.5" /> Notas
+                  </button>
+                  <button 
+                    onClick={() => setShowCalculatorModal(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 flex-1 text-sm font-bold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl border border-sky-200/50 dark:border-sky-800/30 transition-all active:scale-95"
+                  >
+                    <Calculator className="w-4.5 h-4.5" /> Calculadora
+                  </button>
               </div>
-
-              <button 
-                onClick={() => {
-                  setPendingPhotoFn(null); // Don't pass the photo up, just download it
-                  setShowCameraModal(true);
-                }}
-                className="p-2 text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-full transition-colors flex items-center justify-center mr-1 border border-blue-200 dark:border-blue-800/50"
-                title="Cámara"
-              >
-                <Camera className="w-5 h-5" />
-              </button>
-
-              <button 
-                onClick={() => setShowNotesModal(true)}
-                className="p-2 text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-900/30 rounded-full transition-colors hidden sm:flex"
-                title="Notas Rápidas"
-              >
-                <StickyNote className="w-5 h-5" />
-              </button>
-
-              <button 
-                onClick={() => setShowCalculatorModal(true)}
-                className="p-2 text-sky-500 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-900/30 rounded-full transition-colors hidden sm:flex"
-                title="Calculadora"
-              >
-                <Calculator className="w-5 h-5" />
-              </button>
-
-              <button 
-                onClick={() => setShowSettingsModal(true)}
-                className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full transition-colors flex items-center justify-center"
-                aria-label="Ajustes"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-              {(appState === 'input' || appState === 'home') && (
-                <button 
-                  onClick={() => setShowHistoryModal(true)}
-                  className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full transition-colors flex items-center justify-center"
-                  aria-label="Ver historial"
-                >
-                  <History className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Mobile bottom tools bar */}
-          <div className="flex sm:hidden justify-center items-center py-2 gap-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
-             <button 
-                onClick={() => setShowNotesModal(true)}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 flex-1 mx-2 text-sm font-semibold text-sky-700 dark:text-sky-500 bg-sky-50 dark:bg-sky-900/20 rounded-xl border border-sky-200 dark:border-sky-800/50"
-              >
-                <StickyNote className="w-4 h-4" /> Notas
-              </button>
-              <button 
-                onClick={() => setShowCalculatorModal(true)}
-                className="flex items-center justify-center gap-1.5 px-4 py-2 flex-1 mx-2 text-sm font-semibold text-sky-700 dark:text-sky-500 bg-sky-50 dark:bg-sky-900/20 rounded-xl border border-sky-200 dark:border-sky-800/50"
-              >
-                <Calculator className="w-4 h-4" /> Calculadora
-              </button>
-          </div>
-        </header>
-        )}
+            </motion.header>
+          )}
+        </AnimatePresence>
 
         {/* Main Content Area */}
         <main className="w-full pb-24">
-          {appState === 'home' && (
-            <HomeView 
-              onStartShift={(fund, tpv) => {
-                setTotalFund(fund);
-                setTpvNumber(tpv);
-                setIsBoxOpen(true);
-                addFundHistory('open', fund, `Se abrió caja con $${fund.toFixed(2)}`, true);
-                setAppState('input');
-                toast.success(`Jornada iniciada con TPV ${tpv} y fondo de $${fund.toFixed(2)}`);
-              }}
-              onViewHistory={() => setShowHistoryModal(true)}
-            />
-          )}
-          {appState === 'input' && (
-            <div className="p-4 md:p-6">
-            <InputView 
-              existingRouteInfo={routeInfo}
-              onProcessed={handleRouteProcessed} 
-              onClearRoute={handleClearRoute}
-            />
-            </div>
-          )}
-          {appState === 'phone-input' && routeInfo && (
-            <div className="p-4 md:p-6">
-        <PhoneInputView
-          routeInfo={routeInfo}
-          onBack={() => setAppState('input')}
-          onNext={(updatedRoute) => {
-            setRouteInfo(updatedRoute);
-            setAppState('review');
-          }}
-        />
-        </div>
-      )}
-
-      {appState === 'review' && routeInfo && (
-        <div className="p-4 md:p-6">
-            <ReviewView 
-              routeInfo={routeInfo} 
-              onStartDelivery={(reorderedInfo) => {
-                setRouteInfo(reorderedInfo);
-                setAppState('delivering');
-              }}
-              onCancel={() => setAppState('phone-input')}
-            />
-            </div>
-          )}
-          {appState === 'delivering' && routeInfo && (
-            <div className="p-4 md:p-6">
-            <DeliveryView 
-              routeInfo={routeInfo} 
-              currentIndex={currentIndex}
-              onIndexChange={setCurrentIndex}
-              onCancel={() => setAppState('review')}
-              onFinish={(updatedOrder) => {
-                let finalRouteInfo = routeInfo;
-                if (updatedOrder) {
-                  const newOrders = [...routeInfo.orders];
-                  newOrders[currentIndex] = updatedOrder;
-                  finalRouteInfo = { ...routeInfo, orders: newOrders };
-                  setRouteInfo(finalRouteInfo);
-                }
-
-                const historyItem = {
-                  date: new Date().toISOString(),
-                  route: finalRouteInfo
-                };
-                
-                // Read existing history
-                const savedHistory = localStorage.getItem('logiruta_history');
-                const historyArray = savedHistory ? JSON.parse(savedHistory) : [];
-                
-                // Add new item and save
-                historyArray.push(historyItem);
-                localStorage.setItem('logiruta_history', JSON.stringify(historyArray));
-                
-                // Clear active route state to prevent going back to finished route
-                setRouteInfo(null);
-                setCurrentIndex(0);
-                localforage.removeItem('logiruta_images').catch(console.error);
-                localforage.removeItem('logiruta_text').catch(console.error);
-                localforage.removeItem('logiruta_state').catch(console.error);
-                
-                setAppState('input');
-                setShowHistoryModal(true);
-              }}
-              onPhotoRequest={(callback) => {
-                if (useCustomCamera) {
-                  setPendingPhotoFn(() => callback);
-                  setShowCameraModal(true);
-                } else {
-                  // native camera
-                }
-              }}
-              useCustomCamera={useCustomCamera}
-              onNext={(updatedOrder) => {
-                if (!routeInfo) return;
-                const newOrders = [...routeInfo.orders];
-                newOrders[currentIndex] = updatedOrder;
-                setRouteInfo({ ...routeInfo, orders: newOrders });
-                setCurrentIndex(currentIndex + 1);
-              }}
-              onFundChange={(amount, desc, type) => {
-                if (type === 'add') {
-                   setTotalFund(prev => prev + amount);
-                   addFundHistory('add', amount, desc);
-                } else if (type === 'subtract') {
-                   setTotalFund(prev => Math.max(0, prev - amount));
-                   addFundHistory('subtract', amount, desc);
-                }
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={appState}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+            >
+              {appState === 'home' && (
+                <HomeView 
+                  onStartShift={(fund, tpv) => {
+                    setTotalFund(fund);
+                    setTpvNumber(tpv);
+                    setIsBoxOpen(true);
+                    addFundHistory('open', fund, `Se abrió caja con $${fund.toFixed(2)}`, true);
+                    setAppState('input');
+                    toast.success(`Jornada iniciada con TPV ${tpv} y fondo de $${fund.toFixed(2)}`);
+                  }}
+                  onViewHistory={() => setShowHistoryModal(true)}
+                />
+              )}
+              {appState === 'input' && (
+                <div className="p-4 md:p-6">
+                <InputView 
+                  existingRouteInfo={routeInfo}
+                  onProcessed={handleRouteProcessed} 
+                  onClearRoute={handleClearRoute}
+                />
+                </div>
+              )}
+              {appState === 'phone-input' && routeInfo && (
+                <div className="p-4 md:p-6">
+            <PhoneInputView
+              routeInfo={routeInfo}
+              onBack={() => setAppState('input')}
+              onNext={(updatedRoute) => {
+                setRouteInfo(updatedRoute);
+                setAppState('review');
               }}
             />
             </div>
           )}
+    
+          {appState === 'review' && routeInfo && (
+            <div className="p-4 md:p-6">
+                <ReviewView 
+                  routeInfo={routeInfo} 
+                  onStartDelivery={(reorderedInfo) => {
+                    setRouteInfo(reorderedInfo);
+                    setAppState('delivering');
+                  }}
+                  onCancel={() => setAppState('phone-input')}
+                />
+                </div>
+              )}
+              {appState === 'delivering' && routeInfo && (
+                <div className="p-4 md:p-6">
+                <DeliveryView 
+                  routeInfo={routeInfo} 
+                  currentIndex={currentIndex}
+                  onIndexChange={setCurrentIndex}
+                  onCancel={() => setAppState('review')}
+                  onFinish={(updatedOrder) => {
+                    let finalRouteInfo = routeInfo;
+                    if (updatedOrder) {
+                      const newOrders = [...routeInfo.orders];
+                      newOrders[currentIndex] = updatedOrder;
+                      finalRouteInfo = { ...routeInfo, orders: newOrders };
+                      setRouteInfo(finalRouteInfo);
+                    }
+    
+                    const historyItem = {
+                      date: new Date().toISOString(),
+                      route: finalRouteInfo
+                    };
+                    
+                    // Read existing history
+                    const savedHistory = localStorage.getItem('logiruta_history');
+                    const historyArray = savedHistory ? JSON.parse(savedHistory) : [];
+                    
+                    // Add new item and save
+                    historyArray.push(historyItem);
+                    localStorage.setItem('logiruta_history', JSON.stringify(historyArray));
+                    
+                    // Clear active route state to prevent going back to finished route
+                    setRouteInfo(null);
+                    setCurrentIndex(0);
+                    localforage.removeItem('logiruta_images').catch(console.error);
+                    localforage.removeItem('logiruta_text').catch(console.error);
+                    localforage.removeItem('logiruta_state').catch(console.error);
+                    
+                    setAppState('input');
+                    setShowHistoryModal(true);
+                  }}
+                  onPhotoRequest={(callback) => {
+                    if (useCustomCamera) {
+                      setPendingPhotoFn(() => callback);
+                      setShowCameraModal(true);
+                    } else {
+                      // native camera
+                    }
+                  }}
+                  useCustomCamera={useCustomCamera}
+                  onNext={(updatedOrder) => {
+                    if (!routeInfo) return;
+                    const newOrders = [...routeInfo.orders];
+                    newOrders[currentIndex] = updatedOrder;
+                    setRouteInfo({ ...routeInfo, orders: newOrders });
+                    setCurrentIndex(currentIndex + 1);
+                  }}
+                  onFundChange={(amount, desc, type) => {
+                    if (type === 'add') {
+                       setTotalFund(prev => prev + amount);
+                       addFundHistory('add', amount, desc);
+                    } else if (type === 'subtract') {
+                       setTotalFund(prev => Math.max(0, prev - amount));
+                       addFundHistory('subtract', amount, desc);
+                    }
+                  }}
+                />
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
         
         {/* Modals */}
@@ -569,6 +613,19 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Installation Button */}
+                {isInstallable && (
+                  <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <button
+                      onClick={handleInstallClick}
+                      className="w-full py-4 bg-blue-600 dark:bg-blue-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-[0.98]"
+                    >
+                      <Package className="w-5 h-5 text-blue-200" />
+                      Instalar Aplicación
+                    </button>
+                    <p className="text-[10px] text-center text-gray-400 mt-2">Instala LogiRuta para una mejor experiencia sin conexión</p>
+                  </div>
+                )}
 
 
               </div>

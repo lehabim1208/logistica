@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ProcessingResult, Order } from '../lib/gemini';
 import { Navigation2, CheckCircle, ChevronRight, ChevronDown, ChevronUp, MessageSquare, CreditCard, Receipt, Camera, User, Phone, MessageCircle, X, Plus, Ticket } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { dbLocal } from '../lib/dbLocal';
 import toast from 'react-hot-toast';
 
 type PaymentMethodType = 'cash' | 'card' | 'vales';
@@ -146,6 +147,13 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
     };
 
     setIsSaving(true);
+    
+    // Offline sync queue
+    dbLocal.addToQueue({
+      type: 'delivery_update',
+      data: updatedOrder
+    }).catch(console.error);
+
     toast.success("Pedido entregado. Cargando siguiente...");
     
     setTimeout(() => {

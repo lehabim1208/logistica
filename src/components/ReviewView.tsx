@@ -90,8 +90,9 @@ export function ReviewView({ routeInfo, onStartDelivery, onCancel }: ReviewViewP
       return `${cleanAddress || o.clientName}, Veracruz`;
     };
 
-    const stops = orders.map(getLocationStr).map(encodeURIComponent).join('/');
-    const url = `https://www.google.com/maps/dir/${origin}/${stops}/data=!3m1!4b1!4m2!4m1!3e0`;
+    const waypoints = orders.slice(0, -1).map(getLocationStr).map(encodeURIComponent).join('|');
+    const destination = getLocationStr(orders[orders.length - 1]);
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&waypoints=${waypoints}&travelmode=driving`;
     window.open(url, '_blank');
   };
 
