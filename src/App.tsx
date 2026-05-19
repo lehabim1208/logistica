@@ -11,7 +11,7 @@ import { ShiftSummaryModal } from './components/ShiftSummaryModal';
 import { NotesModal } from './components/NotesModal';
 import { CalculatorModal } from './components/CalculatorModal';
 import { ProcessingResult } from './lib/gemini';
-import { Package, Clock, History, Map as MapIcon, Wallet, Camera, Settings, Moon, Sun, Monitor, StickyNote, Calculator, X } from 'lucide-react';
+import { Package, Clock, History, Map as MapIcon, Wallet, Camera, Settings, Moon, Sun, Monitor, StickyNote, Calculator, X, Cloud, CloudOff, Loader2, Check } from 'lucide-react';
 import localforage from 'localforage';
 
 export type AppState = 'home' | 'input' | 'phone-input' | 'review' | 'delivering';
@@ -19,6 +19,30 @@ export type Theme = 'light' | 'dark' | 'system';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('home');
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsReconnecting(true);
+      setTimeout(() => {
+         setIsOnline(true);
+         setIsReconnecting(false);
+      }, 1500); // simulate reconnecting state briefly for UX
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setIsReconnecting(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
   const [routeInfo, setRouteInfo] = useState<ProcessingResult | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -190,6 +214,24 @@ export default function App() {
                 <Package className="w-5 h-5" />
               </div>
               <span className="font-bold text-xl tracking-tight text-gray-900 dark:text-white hidden sm:block">LogiRuta<span className="text-blue-600 dark:text-blue-400">.</span></span>
+              <div className="ml-2 flex items-center justify-center relative w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700" title={!isOnline ? "Trabajando sin conexión" : isReconnecting ? "Reconectando..." : "Conectado"}>
+                {!isOnline ? (
+                   <>
+                     <CloudOff className="w-4 h-4 text-red-500 relative z-0" />
+                     <X className="w-3 h-3 text-red-600 absolute bottom-1 right-1 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
+                   </>
+                ) : isReconnecting ? (
+                   <>
+                     <Cloud className="w-4 h-4 text-blue-500 relative z-0" />
+                     <Loader2 className="w-3 h-3 text-blue-600 absolute bottom-1 right-1 bg-white dark:bg-gray-800 rounded-full animate-spin" strokeWidth={3} />
+                   </>
+                ) : (
+                   <>
+                     <Cloud className="w-4 h-4 text-green-500 relative z-0" />
+                     <Check className="w-3 h-3 text-green-600 absolute bottom-1 right-1 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
+                   </>
+                )}
+              </div>
             </div>
             
             <div className="flex items-center gap-2">
