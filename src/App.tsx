@@ -261,7 +261,7 @@ export default function App() {
                   <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-500/20">
                     <Package className="w-4.5 h-4.5" />
                   </div>
-                  <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white hidden xs:block">LogiRuta<span className="text-blue-600 dark:text-blue-400">.</span></span>
+                  <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white hidden xs:block">NextRoute<span className="text-blue-600 dark:text-blue-400">.</span></span>
                   <div className="ml-1 flex items-center justify-center relative w-7 h-7 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700" title={!isOnline ? "Trabajando sin conexión" : isReconnecting ? "Reconectando..." : "Conectado"}>
                     {!isOnline ? (
                        <>
@@ -623,7 +623,7 @@ export default function App() {
                       <Package className="w-5 h-5 text-blue-200" />
                       Instalar Aplicación
                     </button>
-                    <p className="text-[10px] text-center text-gray-400 mt-2">Instala LogiRuta para una mejor experiencia sin conexión</p>
+                    <p className="text-[10px] text-center text-gray-400 mt-2">Instala NextRoute para una mejor experiencia sin conexión</p>
                   </div>
                 )}
 

@@ -14,9 +14,9 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon-192x192.png', 'icon-512x512.png'],
         manifest: {
-          id: 'logiruta-ai-app-1',
-          name: 'LogiRuta AI - Logística Inteligente',
-          short_name: 'LogiRuta',
+          id: '/',
+          name: 'NextRoute - Logística Inteligente',
+          short_name: 'NextRoute',
           description: 'Sistema de logística optimizado con Inteligencia Artificial para repartidores.',
           theme_color: '#2563eb',
           background_color: '#ffffff',
@@ -34,6 +34,18 @@ export default defineConfig(({mode}) => {
               purpose: 'any'
             },
             {
+              src: '/icon-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable'
+            },
+            {
+              src: '/icon-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any maskable'
+            },
+            {
               src: '/icon-512x512.png',
               sizes: '512x512',
               type: 'image/png',
@@ -44,6 +56,12 @@ export default defineConfig(({mode}) => {
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'
+            },
+            {
+              src: '/icon-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable'
             }
           ]
         },
@@ -71,12 +89,15 @@ export default defineConfig(({mode}) => {
             },
             {
               urlPattern: ({ request }) => request.destination === 'image',
-              handler: 'StaleWhileRevalidate',
+              handler: 'CacheFirst',
               options: {
                 cacheName: 'images-cache',
                 expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
                 }
               }
             },
@@ -84,9 +105,16 @@ export default defineConfig(({mode}) => {
               urlPattern: ({ request }) => 
                 request.destination === 'script' || 
                 request.destination === 'style',
-              handler: 'StaleWhileRevalidate',
+              handler: 'CacheFirst',
               options: {
-                cacheName: 'static-resources'
+                cacheName: 'static-resources',
+                expiration: {
+                  maxEntries: 100,
+                  maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
+                },
+                cacheableResponse: {
+                  statuses: [0, 200]
+                }
               }
             },
             {
