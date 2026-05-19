@@ -14,7 +14,7 @@ import { ProcessingResult } from './lib/gemini';
 import { Package, Clock, History, Map as MapIcon, Wallet, Camera, Settings, Moon, Sun, Monitor, StickyNote, Calculator, X } from 'lucide-react';
 import localforage from 'localforage';
 
-export type AppState = 'home' | 'input' | 'phone-input' | 'review' | 'delivering' | 'history';
+export type AppState = 'home' | 'input' | 'phone-input' | 'review' | 'delivering';
 export type Theme = 'light' | 'dark' | 'system';
 
 export default function App() {
@@ -38,6 +38,7 @@ export default function App() {
   const [showShiftSummary, setShowShiftSummary] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showTpvModal, setShowTpvModal] = useState(false);
   const [tpvInput, setTpvInput] = useState('');
   const [fundInput, setFundInput] = useState('');
@@ -72,7 +73,13 @@ export default function App() {
     if (savedState) {
       try {
         const parsed = JSON.parse(savedState);
-        if (parsed.appState && parsed.appState !== 'home') setAppState(parsed.appState);
+        if (parsed.appState && parsed.appState !== 'home') {
+          if (parsed.appState === 'history') {
+             setAppState('input');
+          } else {
+             setAppState(parsed.appState);
+          }
+        }
         if (parsed.routeInfo) setRouteInfo(parsed.routeInfo);
         if (parsed.currentIndex !== undefined) setCurrentIndex(parsed.currentIndex);
       } catch (e) {}
@@ -239,13 +246,13 @@ export default function App() {
               >
                 <Settings className="w-5 h-5" />
               </button>
-              {(appState === 'input' || appState === 'history') && (
+              {(appState === 'input' || appState === 'home') && (
                 <button 
-                  onClick={() => setAppState(appState === 'history' ? 'input' : 'history')}
+                  onClick={() => setShowHistoryModal(true)}
                   className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-full transition-colors flex items-center justify-center"
                   aria-label="Ver historial"
                 >
-                  {appState === 'history' ? <Package className="w-5 h-5" /> : <History className="w-5 h-5" />}
+                  <History className="w-5 h-5" />
                 </button>
               )}
             </div>
@@ -281,7 +288,7 @@ export default function App() {
                 setAppState('input');
                 toast.success(`Jornada iniciada con TPV ${tpv} y fondo de $${fund.toFixed(2)}`);
               }}
-              onViewHistory={() => setAppState('history')}
+              onViewHistory={() => setShowHistoryModal(true)}
             />
           )}
           {appState === 'input' && (
@@ -354,7 +361,8 @@ export default function App() {
                 localforage.removeItem('logiruta_text').catch(console.error);
                 localforage.removeItem('logiruta_state').catch(console.error);
                 
-                setAppState('history');
+                setAppState('input');
+                setShowHistoryModal(true);
               }}
               onPhotoRequest={(callback) => {
                 if (useCustomCamera) {
@@ -384,16 +392,31 @@ export default function App() {
             />
             </div>
           )}
-          {appState === 'history' && (
-            <div className="p-4 md:p-6">
-            <HistoryView onBack={() => {
-              setAppState('input');
-            }} />
-            </div>
-          )}
         </main>
         
         {/* Modals */}
+        {showHistoryModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex flex-col justify-end sm:justify-center animate-in fade-in p-0 sm:p-4">
+            <div className="bg-white dark:bg-gray-800 w-full sm:max-w-2xl sm:mx-auto sm:rounded-2xl shadow-2xl flex flex-col h-[90vh] sm:h-[85vh] animate-in slide-in-from-bottom">
+              <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-white dark:bg-gray-800 sm:rounded-t-2xl">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <History className="w-6 h-6 text-blue-500" />
+                  Historial de Viajes
+                </h2>
+                <button 
+                  onClick={() => setShowHistoryModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto w-full">
+                <HistoryView onBack={() => setShowHistoryModal(false)} hideHeader={true} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {showCameraModal && (
           <CameraWatermarkModal
             onClose={() => {

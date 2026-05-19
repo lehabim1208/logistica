@@ -8,7 +8,7 @@ interface HistoryItem {
   route: ProcessingResult;
 }
 
-export function HistoryView({ onBack }: { onBack: () => void }) {
+export function HistoryView({ onBack, hideHeader }: { onBack: () => void, hideHeader?: boolean }) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
@@ -55,15 +55,17 @@ export function HistoryView({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-300">
-      <div className="flex items-center gap-4 mb-6">
-        <button 
-          onClick={onBack}
-          className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-        >
-          <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-        </button>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historial de Viajes</h2>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-4 mb-6">
+          <button 
+            onClick={onBack}
+            className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          >
+            <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Historial de Viajes</h2>
+        </div>
+      )}
 
       {history.length === 0 ? (
         <div className="text-center py-20 bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-sm">
