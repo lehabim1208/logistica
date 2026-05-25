@@ -265,7 +265,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-gray-800 shadow-xl relative">
         
-        <Toaster position="top-center" closeButton richColors />
+        <Toaster position="top-center" richColors swipeDirections={['left', 'right']} />
         
         {/* Header / Nav */}
         <AnimatePresence>
@@ -538,8 +538,18 @@ export default function App() {
             onCapture={(photoDataUrl) => {
               if (pendingPhotoFn) {
                 pendingPhotoFn(photoDataUrl);
+                toast.success('Fotografía capturada con éxito');
+              } else {
+                const a = document.createElement('a');
+                a.href = photoDataUrl;
+                a.download = `Logiruta_${new Date().getTime()}.jpg`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                toast.success('Fotografía guardada con éxito. Puedes tomar otra.');
               }
             }}
+
           />
         )}
 

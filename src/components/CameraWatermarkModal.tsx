@@ -86,6 +86,7 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
     : currentTime.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour12: true, hour: 'numeric', minute: '2-digit', second: '2-digit' }).toLowerCase();
 
   const [cameraError, setCameraError] = useState(false);
+  const [flash, setFlash] = useState(false);
 
   // Camera handling
   const startCamera = useCallback(async () => {
@@ -127,6 +128,12 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
+    
+    if (video.readyState < 2 || video.videoWidth === 0) {
+       toast.error("La cámara aún se está inicializando, espera un momento...");
+       return;
+    }
+
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -269,12 +276,17 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
     const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
     
     if (onCapture) {
+      setFlash(true);
+      setTimeout(() => setFlash(false), 200);
       onCapture(dataUrl);
     }
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col justify-between animate-in fade-in duration-300">
+      {flash && (
+        <div className="absolute inset-0 bg-white z-[110] opacity-100 pointer-events-none" />
+      )}
       <button 
         onClick={onClose} 
         className="absolute top-4 left-4 z-10 p-3 bg-black/40 rounded-full text-white hover:bg-black/60 transition"
