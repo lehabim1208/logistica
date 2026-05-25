@@ -262,12 +262,7 @@ export default function App() {
   if (!isLoaded) return null;
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, scale: 0.98, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-      className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300"
-    >
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-gray-800 shadow-xl relative">
         
         <Toaster position="top-center" closeButton richColors />
@@ -843,6 +838,6 @@ export default function App() {
           />
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }

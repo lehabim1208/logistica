@@ -5,30 +5,22 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
 // Register service worker for PWA only in production to avoid stale browser cache in development preview
-// FORCE CLEAR CACHE TEMPORARILY:
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    let unregisteredAny = false;
-    for (const registration of registrations) {
-      registration.unregister();
-      unregisteredAny = true;
-    }
-    if (unregisteredAny) {
-      console.log('Unregistered service workers. Reloading webpage...');
-      window.location.reload();
-    }
-  });
-}
-
-if ('caches' in window) {
-  caches.keys().then((names) => {
-    for (const name of names) {
-      caches.delete(name);
-    }
-  });
-}
-
-registerSW({
+if (import.meta.env.DEV) {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      let unregisteredAny = false;
+      for (const registration of registrations) {
+        registration.unregister();
+        unregisteredAny = true;
+      }
+      if (unregisteredAny) {
+        console.log('Unregistered service workers in development. Reloading webpage...');
+        window.location.reload();
+      }
+    });
+  }
+} else {
+  registerSW({
     onNeedRefresh() {
       // Show prompt
     },
@@ -36,6 +28,7 @@ registerSW({
       // Offline ready notification
     },
   });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
