@@ -108,9 +108,7 @@ export default function App() {
   
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [customGeminiKey, setCustomGeminiKey] = useState(() => {
-    const saved = localStorage.getItem('logiruta_custom_gemini_api_key');
-    if (saved && saved !== 'AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY') return saved;
-    return '';
+    return localStorage.getItem('logiruta_custom_gemini_api_key') || '';
   });
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('logiruta_theme');
@@ -682,7 +680,7 @@ export default function App() {
                       setCustomGeminiKey(e.target.value);
                       localStorage.setItem('logiruta_custom_gemini_api_key', e.target.value);
                     }}
-                    placeholder="AIzaSy..."
+                    placeholder="Ingresa tu clave de Gemini API..."
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-xs font-mono text-gray-900 dark:text-white focus:border-blue-500 transition-colors"
                   />
                   {customGeminiKey && (
@@ -693,7 +691,7 @@ export default function App() {
                       }}
                       className="text-[10px] text-red-500 hover:text-red-600 mt-1 font-semibold block text-right cursor-pointer"
                     >
-                      Restablecer clave predeterminada
+                      Eliminar clave guardada
                     </button>
                   )}
                 </div>

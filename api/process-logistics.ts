@@ -10,9 +10,6 @@ export default async function handler(req: any, res: any) {
     const { imagesBase64, financialText, userLocation } = req.body;
     const rawApiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
     let clientApiKey = Array.isArray(rawApiKey) ? rawApiKey[0] : (rawApiKey || "");
-    if (clientApiKey === "AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY") {
-      return res.status(401).json({ error: "La clave API que está configurada en la App o Vercel es la misma que fue expirada/filtrada. Por favor, genera una nueva en AI Studio y asegúrate de hacer un REDEPLOY en Vercel para que tome los cambios." });
-    }
     
     if (!clientApiKey || clientApiKey === "MY_GEMINI_API_KEY" || clientApiKey.trim() === "") {
       return res.status(401).json({ error: "No se encontró API Key. Configura GEMINI_API_KEY en Vercel o en las variables de entorno, o ingrésala en la app." });
