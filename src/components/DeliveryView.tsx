@@ -169,22 +169,38 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
 
     toast.success("Pedido entregado. Cargando siguiente...");
     
+    // Intent para llamar a nuestra Aplicación Puente (Bridge APK)
+    // Cuando el usuario instale tu APK puente, este intent la abrirá,
+    // y tu APK se encargará de abrir Spark nativamente.
+    const bridgeIntent = "intent://open#Intent;scheme=sparkbridge;package=com.tuempresa.sparkbridge;end;";
+
+    // Intentar abrir la app puente
+    window.location.href = bridgeIntent;
+
+    // Sistema de Fallback inteligente con validación de foco
+    const timer = setTimeout(() => {
+      // Si la PWA sigue visible después de 2.5s, es porque la app puente NO está instalada.
+      // Aquí podemos enviarlo a descargar la app puente o dejar un mensaje.
+      if (!document.hidden) {
+        toast.error("Por favor instala la app puente para abrir Spark automáticamente.");
+      }
+    }, 2500);
+
+    // Si la app se abre con éxito, limpiamos el timer para evitar el salto a la Play Store al regresar
+    const limpiarTimer = () => {
+      clearTimeout(timer);
+      window.removeEventListener("pagehide", limpiarTimer);
+      document.removeEventListener("visibilitychange", limpiarTimer);
+    };
+
+    window.addEventListener("pagehide", limpiarTimer);
+    document.addEventListener("visibilitychange", limpiarTimer);
+
+    // El retraso de 2 segundos SOLO APLICA a los cambios visuales de la interfaz
+    // para dar tiempo a ver el Toast o para la transición cuando regrese a la app.
     setTimeout(() => {
       setIsSaving(false);
       
-      const intentUrl = "intent://#Intent;action=android.intent.action.VIEW;package=com.walmart.sparkdriver.mx;component=com.walmart.sparkdriver.mx/com.walmart.sparkdriver.features.splash.SplashActivity;end";
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = intentUrl;
-      document.body.appendChild(iframe);
-
-      setTimeout(() => {
-        if (document.hasFocus()) {
-          window.location.href = "https://play.google.com/store/apps/details?id=com.walmart.sparkdriver.mx";
-        }
-        document.body.removeChild(iframe);
-      }, 500);
-
       if (isFinishing) {
         if (onFinish) onFinish(updatedOrder);
       } else {

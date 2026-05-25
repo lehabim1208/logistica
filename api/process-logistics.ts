@@ -1,7 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -10,6 +8,17 @@ export default async function handler(req: any, res: any) {
   // Aumentar el límite de payload si usa Body Parser integrado (Vercel permite hasta 4.5MB en Serverless gratuitos, tener precaución)
   try {
     const { imagesBase64, financialText, userLocation } = req.body;
+    const rawApiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
+    let clientApiKey = Array.isArray(rawApiKey) ? rawApiKey[0] : (rawApiKey || "");
+    if (clientApiKey === "AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY") {
+      return res.status(401).json({ error: "La clave API que está configurada en la App o Vercel es la misma que fue expirada/filtrada. Por favor, genera una nueva en AI Studio y asegúrate de hacer un REDEPLOY en Vercel para que tome los cambios." });
+    }
+    
+    if (!clientApiKey || clientApiKey === "MY_GEMINI_API_KEY" || clientApiKey.trim() === "") {
+      return res.status(401).json({ error: "No se encontró API Key. Configura GEMINI_API_KEY en Vercel o en las variables de entorno, o ingrésala en la app." });
+    }
+
+    const activeAi = new GoogleGenAI({ apiKey: clientApiKey });
 
     const schema = {
       type: Type.OBJECT,
@@ -81,7 +90,7 @@ IMPERATIVO Y CRÍTICO:
     }));
     parts.push({ text: prompt });
 
-    const response = await ai.models.generateContent({
+    const response = await activeAi.models.generateContent({
       model: "gemini-2.5-flash",
       contents: { parts },
       config: {
@@ -104,6 +113,19 @@ IMPERATIVO Y CRÍTICO:
     res.json(result);
   } catch (error: any) {
     console.error("Error in Gemini API:", error);
-    res.status(500).json({ error: error.message || "Internal Server Error" });
+    let message = error.message || "Internal Server Error";
+    const errorStr = typeof error === 'object' ? JSON.stringify(error) : String(error);
+    
+    if (
+      message.includes("API key expired") || 
+      message.includes("API_KEY_INVALID") || 
+      errorStr.includes("API key expired") || 
+      errorStr.includes("API_KEY_INVALID") ||
+      errorStr.includes("API key") ||
+      errorStr.includes("apiKey")
+    ) {
+      message = "La clave API de Google AI Studio (Gemini) ha expirado o es inválida. Por favor, renuévala o añade una clave de API válida en el menú de Configuración (Settings) para poder procesar capturas.";
+    }
+    res.status(500).json({ error: message });
   }
 }

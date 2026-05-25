@@ -19,7 +19,7 @@ async function startServer() {
       const rawApiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
       let clientApiKey = Array.isArray(rawApiKey) ? rawApiKey[0] : (rawApiKey || "");
       if (clientApiKey === "AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY") {
-        clientApiKey = process.env.GEMINI_API_KEY || "";
+        return res.status(401).json({ error: "La clave API que está configurada en la App o Vercel es la misma que fue expirada/filtrada. Por favor, genera una nueva en AI Studio y asegúrate de hacer un REDEPLOY en Vercel para que tome los cambios." });
       }
       
       if (!clientApiKey || clientApiKey === "MY_GEMINI_API_KEY" || clientApiKey.trim() === "") {
@@ -103,30 +103,7 @@ RECUERDA: Agrupa pedidos de la misma dirección en uno solo, y extrae los númer
           }
         });
       } catch (innerError: any) {
-        const errStr = typeof innerError === 'object' ? JSON.stringify(innerError) : String(innerError);
-        const isKeyError = errStr.includes("API key expired") || 
-                           errStr.includes("API_KEY_INVALID") || 
-                           errStr.includes("API key") || 
-                           errStr.includes("apiKey") ||
-                           (innerError.message && innerError.message.includes("API key"));
-                           
-        if (isKeyError && clientApiKey !== backupKey) {
-          console.warn("API key error detected. Falling back to the provided user key...");
-          const recoveryAi = new GoogleGenAI({ apiKey: backupKey });
-          response = await recoveryAi.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: { parts },
-            config: {
-              systemInstruction,
-              responseMimeType: "application/json",
-              responseSchema: schema,
-              temperature: 0.1,
-              topK: 32,
-            }
-          });
-        } else {
-          throw innerError;
-        }
+        throw innerError;
       }
 
       const text = response.text || "{}";
