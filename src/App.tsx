@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Toaster, toast } from 'react-hot-toast';
+import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 import { dbLocal } from './lib/dbLocal';
 import { HomeView } from './components/HomeView';
@@ -13,7 +13,7 @@ import { ShiftSummaryModal } from './components/ShiftSummaryModal';
 import { NotesModal } from './components/NotesModal';
 import { CalculatorModal } from './components/CalculatorModal';
 import { ProcessingResult } from './lib/gemini';
-import { Package, Clock, History, Map as MapIcon, Wallet, Camera, Settings, Moon, Sun, Monitor, StickyNote, Calculator, X, Cloud, CloudOff, Loader2, Check } from 'lucide-react';
+import { Package, Clock, History, Map as MapIcon, Wallet, Camera, Settings, Moon, Sun, Monitor, StickyNote, Calculator, X, Cloud, CloudOff, Loader2, Check, RefreshCw } from 'lucide-react';
 import localforage from 'localforage';
 
 export type AppState = 'home' | 'input' | 'phone-input' | 'review' | 'delivering';
@@ -101,8 +101,19 @@ export default function App() {
   const [showTpvModal, setShowTpvModal] = useState(false);
   const [tpvInput, setTpvInput] = useState('');
   const [fundInput, setFundInput] = useState('');
+  const [startTime, setStartTime] = useState(() => localStorage.getItem('logiruta_start_time') || '08:00');
+  const [endTime, setEndTime] = useState(() => localStorage.getItem('logiruta_end_time') || '16:00');
+  const [startInput, setStartInput] = useState('');
+  const [endInput, setEndInput] = useState('');
   
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [customGeminiKey, setCustomGeminiKey] = useState(() => {
+    const saved = localStorage.getItem('logiruta_custom_gemini_api_key');
+    if (saved) return saved;
+    const defaultKey = 'AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY';
+    localStorage.setItem('logiruta_custom_gemini_api_key', defaultKey);
+    return defaultKey;
+  });
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('logiruta_theme');
     return (saved as Theme) || 'system';
@@ -173,6 +184,14 @@ export default function App() {
   }, [tpvNumber]);
 
   useEffect(() => {
+    localStorage.setItem('logiruta_start_time', startTime);
+  }, [startTime]);
+
+  useEffect(() => {
+    localStorage.setItem('logiruta_end_time', endTime);
+  }, [endTime]);
+
+  useEffect(() => {
     localStorage.setItem('logiruta_box_open', isBoxOpen.toString());
   }, [isBoxOpen]);
 
@@ -210,12 +229,16 @@ export default function App() {
 
   const addFundHistory = (type: 'open' | 'add' | 'subtract' | 'close', amount: number, description: string, isFromHome = false) => {
     if (!isBoxOpen && !isFromHome) return; // Don't log if box is closed unless forced
+    
+    // Parse description and truncate any runs of digits longer than 4 to their last 4 digits
+    const cleanDescription = description.replace(/\d{5,}/g, (match) => match.slice(-4));
+    
     const entry = {
       id: Math.random().toString(36).substring(7),
       type,
       amount,
       time: new Date().toISOString(),
-      description
+      description: cleanDescription
     };
     setFundHistory(prev => [entry, ...prev]);
     
@@ -244,7 +267,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
       <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-gray-800 shadow-xl relative">
         
-        <Toaster position="top-center" />
+        <Toaster position="top-center" closeButton richColors />
         
         {/* Header / Nav */}
         <AnimatePresence>
@@ -261,7 +284,7 @@ export default function App() {
                   <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-500/20">
                     <Package className="w-4.5 h-4.5" />
                   </div>
-                  <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white hidden xs:block">NextRoute<span className="text-blue-600 dark:text-blue-400">.</span></span>
+                  <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white hidden xs:block">LogiRuta<span className="text-blue-600 dark:text-blue-400">.</span></span>
                   <div className="ml-1 flex items-center justify-center relative w-7 h-7 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700" title={!isOnline ? "Trabajando sin conexión" : isReconnecting ? "Reconectando..." : "Conectado"}>
                     {!isOnline ? (
                        <>
@@ -281,25 +304,36 @@ export default function App() {
                     )}
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-1.5 overflow-hidden">
+                 <div className="flex items-center gap-2 select-none py-1 shrink-0">
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="flex justify-center items-center p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm mr-1"
+                    title="Recargar página"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
                   <div 
-                    className="flex items-center gap-1.5 cursor-pointer bg-green-50 dark:bg-green-900/30 px-2.5 py-1.5 rounded-xl border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-900/50 transition-all active:scale-95 shrink-0"
+                    className="flex items-center gap-1.5 cursor-pointer bg-green-50 dark:bg-green-900/30 px-2.5 py-1.5 rounded-lg border border-green-200 dark:border-green-800/40 hover:bg-green-100 dark:hover:bg-green-900/50 transition-all active:scale-95 shrink-0"
                     onClick={() => setShowFundModal(true)}
                   >
                     <Wallet className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="font-bold text-green-700 dark:text-green-400 text-xs sm:text-sm">
+                    <span className="font-extrabold text-green-700 dark:text-green-400 text-xs text-nowrap">
                       ${totalFund.toFixed(0)}
                     </span>
                   </div>
                   
                   <div 
-                     className="flex items-center gap-1 cursor-pointer bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-green-900/40 transition-all active:scale-95 shrink-0"
-                     onClick={() => { setTpvInput(tpvNumber); setShowTpvModal(true); }}
+                     className="flex items-center gap-1 cursor-pointer bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-green-900/40 transition-all active:scale-95 shrink-0"
+                     onClick={() => { 
+                       setTpvInput(tpvNumber); 
+                       setStartInput(startTime);
+                       setEndInput(endTime);
+                       setShowTpvModal(true); 
+                     }}
                      title="Editar TPV"
                   >
                      <span className="text-[10px] font-black text-blue-800 dark:text-blue-400 uppercase tracking-tighter hidden sm:inline">TPV</span>
-                     <span className="font-bold text-blue-700 dark:text-blue-400 text-xs sm:text-sm">{tpvNumber || '--'}</span>
+                     <span className="font-extrabold text-blue-700 dark:text-blue-400 text-xs text-nowrap">{tpvNumber || '--'}</span>
                   </div>
     
                   <button 
@@ -307,29 +341,27 @@ export default function App() {
                       setPendingPhotoFn(null); 
                       setShowCameraModal(true);
                     }}
-                    className="p-1.5 sm:p-2 text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-xl transition-all active:scale-95 flex items-center justify-center border border-blue-200 dark:border-blue-800/50 shrink-0"
+                    className="p-1.5 text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-all active:scale-95 flex items-center justify-center border border-blue-200 dark:border-blue-800/40 shrink-0"
                     title="Cámara"
                   >
-                    <Camera className="w-4.5 h-4.5" />
+                    <Camera className="w-4 h-4" />
                   </button>
     
                   <button 
                     onClick={() => setShowSettingsModal(true)}
-                    className="p-1.5 sm:p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-xl transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
+                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
                     aria-label="Ajustes"
                   >
-                    <Settings className="w-4.5 h-4.5" />
+                    <Settings className="w-4 h-4" />
                   </button>
                   
-                  {appState === 'input' && (
-                    <button 
-                      onClick={() => setShowHistoryModal(true)}
-                      className="p-1.5 sm:p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-gray-200 rounded-xl transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
-                      aria-label="Ver historial"
-                    >
-                      <History className="w-4.5 h-4.5" />
-                    </button>
-                  )}
+                  <button 
+                    onClick={() => setShowHistoryModal(true)}
+                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
+                    aria-label="Ver historial"
+                  >
+                    <History className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
               
@@ -364,15 +396,18 @@ export default function App() {
             >
               {appState === 'home' && (
                 <HomeView 
-                  onStartShift={(fund, tpv) => {
+                  onStartShift={(fund, tpv, start, end) => {
                     setTotalFund(fund);
                     setTpvNumber(tpv);
+                    setStartTime(start);
+                    setEndTime(end);
                     setIsBoxOpen(true);
                     addFundHistory('open', fund, `Se abrió caja con $${fund.toFixed(2)}`, true);
                     setAppState('input');
                     toast.success(`Jornada iniciada con TPV ${tpv} y fondo de $${fund.toFixed(2)}`);
                   }}
                   onViewHistory={() => setShowHistoryModal(true)}
+                  onViewNotes={() => setShowNotesModal(true)}
                 />
               )}
               {appState === 'input' && (
@@ -512,15 +547,7 @@ export default function App() {
             onCapture={(photoDataUrl) => {
               if (pendingPhotoFn) {
                 pendingPhotoFn(photoDataUrl);
-              } else {
-                const a = document.createElement('a');
-                a.href = photoDataUrl;
-                a.download = `foto_${Date.now()}.jpg`;
-                a.click();
-                toast.success('Foto guardada');
               }
-              setShowCameraModal(false);
-              setPendingPhotoFn(null);
             }}
           />
         )}
@@ -536,35 +563,63 @@ export default function App() {
         {/* TPV Modal */}
         {showTpvModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-xs shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+            <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-sm shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
               <div className="p-5 border-b border-gray-100 dark:border-gray-700 text-center">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Editar TPV</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Datos de la Jornada</h3>
               </div>
-              <div className="p-5">
-                <input
-                  type="text"
-                  value={tpvInput}
-                  onChange={(e) => setTpvInput(e.target.value)}
-                  placeholder="Ej. 1293"
-                  className="w-full text-center text-xl font-bold bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
-                  autoFocus
-                />
-                <button
-                  onClick={() => {
-                    setTpvNumber(tpvInput);
-                    setShowTpvModal(false);
-                    toast.success("TPV actualizado");
-                  }}
-                  className="w-full py-3 mt-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
-                >
-                  Guardar
-                </button>
-                <button
-                  onClick={() => setShowTpvModal(false)}
-                  className="w-full py-2 mt-2 bg-transparent text-gray-500 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition"
-                >
-                  Cancelar
-                </button>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5 ml-1">Número de TPV</label>
+                  <input
+                    type="text"
+                    value={tpvInput}
+                    onChange={(e) => setTpvInput(e.target.value)}
+                    placeholder="Ej. 1293"
+                    className="w-full text-center text-lg font-bold bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 outline-none text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-left">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5 ml-1">Entrada</label>
+                    <input
+                      type="time"
+                      value={startInput}
+                      onChange={(e) => setStartInput(e.target.value)}
+                      className="w-full p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 rounded-xl outline-none font-semibold text-sm text-gray-900 dark:text-white text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-1.5 ml-1">Salida</label>
+                    <input
+                      type="time"
+                      value={endInput}
+                      onChange={(e) => setEndInput(e.target.value)}
+                      className="w-full p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500 rounded-xl outline-none font-semibold text-sm text-gray-900 dark:text-white text-center"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      setTpvNumber(tpvInput);
+                      setStartTime(startInput);
+                      setEndTime(endInput);
+                      setShowTpvModal(false);
+                      toast.success("Datos de jornada actualizados");
+                    }}
+                    className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-600/20"
+                  >
+                    Guardar Cambios
+                  </button>
+                  <button
+                    onClick={() => setShowTpvModal(false)}
+                    className="w-full py-2 mt-2 bg-transparent text-gray-500 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -611,6 +666,35 @@ export default function App() {
                       <span className="text-xs font-semibold">Sistema</span>
                     </button>
                   </div>
+                </div>
+
+                {/* Gemini API Key Override */}
+                <div className="pt-4 border-t border-gray-100 dark:border-gray-700/60">
+                  <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Clave API de Gemini (Opcional)</h4>
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mb-2 leading-snug">
+                    Si la clave de la plataforma está vencida, ingresa una clave personal de Google AI Studio para procesar capturas.
+                  </p>
+                  <input
+                    type="password"
+                    value={customGeminiKey}
+                    onChange={(e) => {
+                      setCustomGeminiKey(e.target.value);
+                      localStorage.setItem('logiruta_custom_gemini_api_key', e.target.value);
+                    }}
+                    placeholder="AIzaSy..."
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-xs font-mono text-gray-900 dark:text-white focus:border-blue-500 transition-colors"
+                  />
+                  {customGeminiKey && (
+                    <button
+                      onClick={() => {
+                        setCustomGeminiKey('');
+                        localStorage.removeItem('logiruta_custom_gemini_api_key');
+                      }}
+                      className="text-[10px] text-red-500 hover:text-red-600 mt-1 font-semibold block text-right cursor-pointer"
+                    >
+                      Restablecer clave predeterminada
+                    </button>
+                  )}
                 </div>
 
                 {/* Installation Button */}
@@ -745,6 +829,7 @@ export default function App() {
           <ShiftSummaryModal 
             totalFund={totalFund}
             fundHistory={fundHistory}
+            tpvNumber={tpvNumber}
             onCancel={() => setShowShiftSummary(false)}
             onFinish={() => {
               addFundHistory('close', totalFund, `Se cerró caja con $${totalFund.toFixed(2)}`);
@@ -752,6 +837,9 @@ export default function App() {
               setTpvNumber('');
               setIsBoxOpen(false);
               setFundHistory([]);
+              // Clear cached times
+              localStorage.removeItem('logiruta_start_time');
+              localStorage.removeItem('logiruta_end_time');
               setShowShiftSummary(false);
               setAppState('home');
               toast.success(`Jornada finalizada exitosamente.`);

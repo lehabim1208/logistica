@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ProcessingResult, Order } from '../lib/gemini';
-import { Navigation2, CheckCircle, ChevronRight, ChevronDown, ChevronUp, MessageSquare, CreditCard, Receipt, Camera, User, Phone, MessageCircle, X, Plus, Ticket } from 'lucide-react';
+import { Navigation2, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, CreditCard, Receipt, Camera, User, Phone, MessageCircle, X, Plus, Ticket } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { dbLocal } from '../lib/dbLocal';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 type PaymentMethodType = 'cash' | 'card' | 'vales';
 
@@ -33,10 +34,14 @@ function getGreeting() {
   return 'Buenas noches';
 }
 
-export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCancel, onFundChange }: DeliveryViewProps) {
+export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCancel, onIndexChange, onFundChange }: DeliveryViewProps) {
   const order = routeInfo?.orders?.[currentIndex];
   const [showSubOrders, setShowSubOrders] = useState(false);
   
+  const activeOrderIndex = routeInfo.orders.findIndex(o => !o.delivered);
+  // Un pedido es "futuro" si no estamos todos entregados, y el local index > activeOrderIndex
+  const isFutureOrder = activeOrderIndex !== -1 && currentIndex > activeOrderIndex;
+
   const [paymentMode, setPaymentMode] = useState<'single' | 'split'>('single');
   const [cashAmount, setCashAmount] = useState('');
   const [cardAmount, setCardAmount] = useState('');
@@ -50,6 +55,7 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
   ]);
   
   const [showAddMethodModal, setShowAddMethodModal] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [receiverName, setReceiverName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isPlOverride, setIsPlOverride] = useState(false);
@@ -136,6 +142,12 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
       onFundChange(actualChangeGiven, `Cambio Pedido ${orderSubStr}`.trim(), 'subtract');
     }
 
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+      .toLowerCase()
+      .replace('pm', 'p.m.')
+      .replace('am', 'a.m.');
+
     const updatedOrder: Order = {
       ...order,
       receiverName: receiverName.trim(),
@@ -143,6 +155,7 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
       collectedCard: finalCollectedCard,
       collectedVales: finalCollectedVales,
       delivered: true,
+      deliveredAt: timeString,
       changeGiven: actualChangeGiven,
     };
 
@@ -158,6 +171,20 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
     
     setTimeout(() => {
       setIsSaving(false);
+      
+      const intentUrl = "intent://#Intent;action=android.intent.action.VIEW;package=com.walmart.sparkdriver.mx;component=com.walmart.sparkdriver.mx/com.walmart.sparkdriver.features.splash.SplashActivity;end";
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = intentUrl;
+      document.body.appendChild(iframe);
+
+      setTimeout(() => {
+        if (document.hasFocus()) {
+          window.location.href = "https://play.google.com/store/apps/details?id=com.walmart.sparkdriver.mx";
+        }
+        document.body.removeChild(iframe);
+      }, 500);
+
       if (isFinishing) {
         if (onFinish) onFinish(updatedOrder);
       } else {
@@ -221,21 +248,52 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 max-w-lg mx-auto">
       
-      {/* Header Status */}
+      {/* Header Status con Paginacion */}
       <div className="bg-gray-900 text-white p-3 flex justify-between items-center rounded-xl shadow-md">
-        <div className="font-medium text-gray-300 text-sm">
-          Entrega {currentIndex + 1} <span className="opacity-50">de</span> {routeInfo.orders.length}
+        <div className="flex items-center gap-1.5 xs:gap-2">
+          <button
+            type="button"
+            disabled={currentIndex === 0}
+            onClick={() => onIndexChange && onIndexChange(currentIndex - 1)}
+            className="p-1 px-2.5 bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 rounded-lg text-xs font-bold transition-all"
+            title="Pedido Anterior"
+          >
+            ← Volver
+          </button>
+          <div className="font-semibold text-gray-300 text-xs sm:text-sm">
+            {currentIndex + 1} / {routeInfo.orders.length}
+          </div>
+          <button
+            type="button"
+            disabled={currentIndex === routeInfo.orders.length - 1}
+            onClick={() => onIndexChange && onIndexChange(currentIndex + 1)}
+            className="p-1 px-2.5 bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 rounded-lg text-xs font-bold transition-all"
+            title="Siguiente Pedido"
+          >
+            Sig. →
+          </button>
         </div>
-        <div className="text-xs bg-white/20 px-2.5 py-0.5 rounded-full font-mono">
-          #{order.orderNumber}
+        <div className="flex items-center gap-2">
+          <div className="text-xs bg-white/20 px-2 py-0.5 rounded-md font-mono">
+            #{order.orderNumber}
+          </div>
         </div>
       </div>
 
-      {/* TR Code Prominent if exists */}
-      {order.trCode && order.trCode !== 'No se proporcionó TR' && (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentIndex}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+          className="space-y-6"
+        >
+          {/* TR Code Prominent if exists */}
+          {order.trCode && order.trCode !== 'No se proporcionó TR' && (
         <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 dark:border-blue-400 p-3 rounded-r-xl shadow-sm flex items-center justify-between border border-blue-100 dark:border-blue-900/50">
           <span className="font-bold text-blue-800 dark:text-blue-300 text-sm tracking-wide uppercase">CÓDIGO TR:</span>
-          <span className="text-xl font-black font-mono text-blue-900 dark:text-blue-100">{order.trCode}</span>
+          <span className="text-xl font-black font-mono text-blue-900 dark:text-blue-100">{order.trCode.replace(/^tr\s*/i, '').replace(/^TR\s*/i, '')}</span>
         </div>
       )}
 
@@ -244,7 +302,14 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
         <div className="p-4 md:p-5 space-y-3">
           
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1 leading-tight">{order.clientName}</h2>
+            <div className="flex items-start justify-between gap-2 flex-wrap mb-1">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white leading-tight">{order.clientName}</h2>
+              {order.deliveryTime && order.deliveryTime !== 'No especificada' && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/60 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                  ⏱ Prometido: {order.deliveryTime}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-600 dark:text-gray-300 leading-snug">{order.address}</p>
           </div>
 
@@ -295,7 +360,7 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Pago: {sub.paymentMethod}</p>
                       {sub.trCode && sub.trCode !== 'No se proporcionó TR' && (
-                        <div className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 p-1.5 rounded font-mono border border-blue-100 dark:border-blue-900/50">TR: {sub.trCode}</div>
+                        <div className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 p-1.5 rounded font-mono border border-blue-100 dark:border-blue-900/50">TR: {sub.trCode.replace(/^tr\s*/i, '')}</div>
                       )}
                       {sub.comments && (
                         <div className="text-xs text-amber-700 dark:text-amber-400 mt-1 bg-amber-50 dark:bg-amber-900/30 p-1.5 rounded border border-amber-100 dark:border-amber-900/50 italic">{sub.comments}</div>
@@ -309,7 +374,35 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
 
           {/* Payment Section */}
           <div className="space-y-3">
-            {isPaid ? (
+            {order.delivered ? (
+              <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/60 p-3.5 rounded-xl space-y-3">
+                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400 mb-2">
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <h3 className="font-bold text-sm">Resumen de Entrega</h3>
+                  {order.deliveredAt && (
+                    <span className="ml-auto text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                      {order.deliveredAt}
+                    </span>
+                  )}
+                </div>
+                
+                <div className="space-y-1.5 text-sm font-medium text-emerald-900 dark:text-emerald-300 bg-white/50 dark:bg-black/20 p-2.5 rounded-lg">
+                  {order.collectedCash ? <div className="flex justify-between"><span>Efectivo:</span> <span>${order.collectedCash.toFixed(2)}</span></div> : null}
+                  {order.collectedCard ? <div className="flex justify-between"><span>Tarjeta:</span> <span>${order.collectedCard.toFixed(2)}</span></div> : null}
+                  {order.collectedVales ? <div className="flex justify-between"><span>Vales:</span> <span>${order.collectedVales.toFixed(2)}</span></div> : null}
+                  {order.changeGiven ? <div className="flex justify-between text-orange-600 dark:text-orange-400"><span>Cambio entregado:</span> <span>${order.changeGiven.toFixed(2)}</span></div> : null}
+                  {!order.collectedCash && !order.collectedCard && !order.collectedVales && (
+                    <div className="text-emerald-700 dark:text-emerald-400">Pago en línea (No se cobró nada)</div>
+                  )}
+                </div>
+                
+                <div className="text-sm pt-2 bg-white/40 dark:bg-black/10 p-2.5 rounded-lg flex items-center gap-2">
+                  <User className="w-4 h-4 text-emerald-600 dark:text-emerald-500" />
+                  <span className="font-semibold text-emerald-900 dark:text-emerald-300">Recibió:</span>
+                  <span className="text-emerald-800 dark:text-emerald-200">{order.receiverName || 'No registrado'}</span>
+                </div>
+              </div>
+            ) : isPaid ? (
               <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 p-3 rounded-xl space-y-2">
                 <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400">
                   <CheckCircle className="w-5 h-5 flex-shrink-0" />
@@ -324,7 +417,7 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 p-3.5 rounded-xl space-y-3">
+              <div className={cn("bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600 p-3.5 rounded-xl space-y-3", isFutureOrder && "opacity-50 pointer-events-none")}>
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-600 dark:text-gray-300 text-sm">Monto a Cobrar</span>
                   <div className="flex items-center gap-2">
@@ -411,20 +504,23 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
               </div>
             )}
 
-            {/* Always ask for receiver name */}
-            <div>
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1.5">
-                <User className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
-                Recibe:
-              </label>
-              <input 
-                type="text" 
-                value={receiverName} 
-                onChange={e => setReceiverName(e.target.value)} 
-                placeholder="Ej. María o Juan" 
-                className="w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-sm"
-              />
-            </div>
+            {/* Always ask for receiver name if not delivered */}
+            {!order.delivered && (
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200 mb-1.5">
+                  <User className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                  Recibe:
+                </label>
+                <input 
+                  type="text" 
+                  value={receiverName} 
+                  onChange={e => setReceiverName(e.target.value)} 
+                  disabled={isFutureOrder}
+                  placeholder="Ej. María o Juan" 
+                  className={cn("w-full p-2.5 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white rounded-lg outline-none font-medium text-sm transition-colors", isFutureOrder ? "opacity-50 cursor-not-allowed bg-gray-50 focus:ring-0" : "focus:ring-2 focus:ring-blue-500")}
+                />
+              </div>
+            )}
             
             {order.comments && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/50 p-2.5 rounded-lg">
@@ -442,13 +538,55 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
       {isSaving ? (
         <div className="flex flex-col items-center justify-center py-4 animate-pulse">
            <CheckCircle className="w-10 h-10 text-blue-500 mb-2" />
-           <p className="text-base font-bold text-gray-800 dark:text-gray-200">Entregado</p>
+           <p className="text-base font-bold text-gray-800 dark:text-gray-200">Guardando...</p>
            <p className="text-gray-500 dark:text-gray-400 text-xs">Siguiente pedido...</p>
+        </div>
+      ) : order.delivered ? (
+        <div className="flex flex-col gap-2.5 mt-2">
+          {(!isLast) && (
+            <button
+               onClick={() => { if (onIndexChange) onIndexChange(currentIndex + 1); }}
+               className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-base shadow-sm transition-all flex items-center justify-center gap-2"
+            >
+              Siguiente Pedido
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
+          <button
+            onClick={() => { if (onCancel) onCancel(); }}
+            className="w-full py-2.5 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 font-medium transition-colors text-xs bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-lg"
+          >
+            Volver al mapa de rutas
+          </button>
+        </div>
+      ) : isFutureOrder ? (
+         <div className="flex flex-col gap-2.5 mt-2">
+           <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 flex items-start gap-2 p-3.5 rounded-xl">
+             <div className="text-amber-600 dark:text-amber-400">
+               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+             </div>
+             <div>
+               <p className="text-sm font-bold text-amber-800 dark:text-amber-400">Pedido Futuro</p>
+               <p className="text-xs text-amber-700 dark:text-amber-500 font-medium">No puedes procesar este pedido hasta completar los anteriores.</p>
+             </div>
+           </div>
+           <button
+            disabled
+            className="w-full py-3.5 text-white/50 bg-gray-400 dark:bg-gray-700 rounded-xl font-bold text-base shadow-sm transition-all flex items-center justify-center gap-2 cursor-not-allowed"
+          >
+            Guardar y Continuar
+          </button>
         </div>
       ) : (
       <div className="flex flex-col gap-2.5">
          <button
-          onClick={() => handleAction(isLast)}
+          onClick={() => {
+            if (!receiverName.trim()) {
+              toast.error("Por favor, ingresa el nombre de quién recibe el pedido.");
+              return;
+            }
+            setShowSaveConfirm(true);
+          }}
           className={cn(
             "w-full py-3.5 text-white rounded-xl font-bold text-base shadow-sm transition-all flex items-center justify-center gap-2",
             isLast ? "bg-green-600 hover:bg-green-700" : "bg-gray-900 hover:bg-black dark:bg-gray-100 dark:hover:bg-white dark:text-gray-900"
@@ -473,6 +611,89 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
           Pausa / Volver al mapa de rutas
         </button>
       </div>
+      )}
+
+      </motion.div>
+      </AnimatePresence>
+
+      {/* Save Confirmation Modal */}
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-center">Registrar Entrega</h3>
+            
+            <div className="bg-gray-50 dark:bg-gray-900/40 rounded-2xl p-4 mb-6 space-y-3 text-sm">
+              <div className="flex justify-between items-start gap-2 border-b border-gray-100 dark:border-gray-800 pb-2">
+                <span className="text-[10px] text-gray-400 font-bold uppercase shrink-0">Cliente</span>
+                <span className="font-semibold text-gray-800 dark:text-white text-right leading-tight max-w-[200px] truncate">{order.clientName}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-2">
+                <span className="text-[10px] text-gray-400 font-bold uppercase">Recibe</span>
+                <span className="font-bold text-gray-800 dark:text-white">{receiverName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] text-gray-400 font-bold uppercase">Monto</span>
+                <span className="font-black text-blue-600 dark:text-blue-400">
+                  {isPaid ? 'Pagado en línea' : (
+                    <>
+                      ${(
+                        (paymentMode === 'single'
+                          ? (Number(cashAmount) || 0) + (Number(cardAmount) || 0) + (Number(valesAmount) || 0)
+                          : splitMethods.reduce((sum, m) => sum + (Number(m.amount) || 0), 0)
+                        )
+                      ).toFixed(2)}
+                    </>
+                  )}
+                </span>
+              </div>
+              {!isPaid && (
+                <div className="text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-800 pt-2 flex flex-col gap-1">
+                  {paymentMode === 'single' ? (
+                    <>
+                      {cashAmount && <div>• Efectivo: ${Number(cashAmount).toFixed(2)}</div>}
+                      {cardAmount && <div>• Tarjeta: ${Number(cardAmount).toFixed(2)}</div>}
+                      {valesAmount && <div>• Vales: ${Number(valesAmount).toFixed(2)}</div>}
+                    </>
+                  ) : (
+                    splitMethods.map((m, idx) => m.amount && (
+                      <div key={idx}>• {m.type === 'cash' ? 'Efectivo' : m.type === 'card' ? 'Tarjeta' : 'Vales'}: ${Number(m.amount).toFixed(2)}</div>
+                    ))
+                  )}
+                </div>
+              )}
+              {(paymentMode === 'single' ? changeSingle : changeToGive) > 0 && (
+                <div className="flex justify-between items-center bg-orange-50 dark:bg-orange-950/20 px-2.5 py-1.5 rounded-lg text-orange-700 dark:text-orange-400 font-bold text-xs">
+                  <span>Cambio Entregado:</span>
+                  <span>${(paymentMode === 'single' ? changeSingle : changeToGive).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+            
+            <p className="text-sm font-semibold text-center text-gray-700 dark:text-gray-300 mb-6">
+              ¿Estás seguro de registrar la entrega?
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSaveConfirm(false)}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold rounded-xl hover:bg-gray-200"
+              >
+                Regresar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSaveConfirm(false);
+                  handleAction(isLast);
+                }}
+                className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-600/20"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Add Method Modal */}

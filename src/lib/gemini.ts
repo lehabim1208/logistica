@@ -4,6 +4,7 @@ export interface Order {
   last4: string; // Last 4 digits for matching
   clientName: string;
   address: string;
+  deliveryTime?: string; // Optional delivery time from capture
   coords?: string; // Optional coordinates override
   lat?: number; 
   lng?: number; 
@@ -18,30 +19,34 @@ export interface Order {
   collectedVales?: number;
   receiverName?: string;
   delivered?: boolean;
+  deliveredAt?: string;
   changeGiven?: number;
   subOrders?: Order[];
 }
 
 export interface ProcessingResult {
   orders: Order[];
-  totalDistanceEst: string;
-  durationEst: string;
-  trafficCondition: string;
   mismatches: string[];
 }
 
-export async function processLogisticsData(imagesBase64: { mimeType: string, data: string }[], financialText: string, userLocation?: { lat: number, lng: number }): Promise<ProcessingResult> {
+export async function processLogisticsData(imagesBase64: { mimeType: string, data: string }[], financialText: string): Promise<ProcessingResult> {
   const payload = {
     imagesBase64,
-    financialText,
-    userLocation
+    financialText
   };
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+
+  const customKey = localStorage.getItem('logiruta_custom_gemini_api_key');
+  if (customKey && customKey.trim()) {
+    headers['x-gemini-api-key'] = customKey.trim();
+  }
 
   const response = await fetch('/api/process-logistics', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers,
     body: JSON.stringify(payload)
   });
 

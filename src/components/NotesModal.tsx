@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Edit2, Save } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface Note {
   id: string;
@@ -17,6 +17,8 @@ export function NotesModal({ onClose }: NotesModalProps) {
   const [newNote, setNewNote] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+
+  const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('logiruta_notes');
@@ -119,12 +121,28 @@ export function NotesModal({ onClose }: NotesModalProps) {
                   ) : (
                     <div className="flex justify-between items-start gap-4">
                       <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap flex-1">{note.content}</p>
-                      <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => startEdit(note)} className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-colors">
-                          <Edit2 className="w-5 h-5 sm:w-4 sm:h-4" />
+                      <div className="flex gap-1.5 items-center shrink-0">
+                         <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEdit(note);
+                          }} 
+                          className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-colors cursor-pointer"
+                          title="Editar nota"
+                          type="button"
+                        >
+                          <Edit2 className="w-5 h-5 sm:w-4 sm:h-4 pointer-events-none" />
                         </button>
-                        <button onClick={() => handleDelete(note.id)} className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors">
-                          <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setNoteToDelete(note.id);
+                          }} 
+                          className="p-2 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors cursor-pointer"
+                          title="Borrar nota"
+                          type="button"
+                        >
+                          <Trash2 className="w-5 h-5 sm:w-4 sm:h-4 pointer-events-none" />
                         </button>
                       </div>
                     </div>
@@ -136,6 +154,32 @@ export function NotesModal({ onClose }: NotesModalProps) {
         </div>
 
       </div>
+
+      {noteToDelete && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-xs p-6 shadow-2xl animate-in zoom-in-95 duration-150 text-center select-none">
+            <h4 className="text-lg font-extrabold text-gray-900 dark:text-white mb-2">¿Borrar nota?</h4>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">¿Estás seguro de que deseas borrar esta nota? Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setNoteToDelete(null)}
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+              >
+                No
+              </button>
+              <button
+                onClick={() => {
+                  handleDelete(noteToDelete);
+                  setNoteToDelete(null);
+                }}
+                className="flex-1 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-colors text-sm shadow-sm"
+              >
+                Sí, borrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

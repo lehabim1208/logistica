@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Trash2, Loader2, ImagePlus, X, Eye, FileText, Image as ImageIcon } from 'lucide-react';
+import { Upload, Trash2, Loader2, ImagePlus, X, Eye, FileText, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { processLogisticsData, ProcessingResult } from '../lib/gemini';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import localforage from 'localforage';
 
 interface InputViewProps {
@@ -19,7 +19,7 @@ const compressImage = (file: File): Promise<string> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const maxDimension = 500; // Reducido para ahorrar datos y procesar MÁS rápido
+        const maxDimension = 1200; // Resolución equilibrada para velocidad y lectura de texto
         
         if (width > height) {
           if (width > maxDimension) {
@@ -38,7 +38,7 @@ const compressImage = (file: File): Promise<string> => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return reject('No canvas context');
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.5)); // Menos calidad = menos peso
+        resolve(canvas.toDataURL('image/jpeg', 0.85)); // Menos calidad = menos peso
       };
       img.onerror = () => reject('Image load error');
       img.src = e.target?.result as string;
@@ -56,6 +56,14 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [showMismatchModal, setShowMismatchModal] = useState(false);
+  const [mismatchData, setMismatchData] = useState<{
+    capturedFolios: { folio: string; client: string }[];
+    financialFolios: string[];
+    missingInFinance: string[];
+    missingInCaptures: string[];
+  } | null>(null);
 
   useEffect(() => {
     const loadSavedData = async () => {
@@ -124,42 +132,100 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
     }
     
     setIsProcessing(true);
-    let loadingToast = toast.loading('Obteniendo ubicación...');
+    let loadingToast = toast.loading('Extrayendo datos de capturas...');
     
     try {
-      // Get location
-      let userLocation: { lat: number, lng: number } | undefined;
-      try {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { 
-            timeout: 5000, 
-            maximumAge: 5 * 60 * 1000 // usa caché de 5 mins para volar
-          });
-        });
-        userLocation = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        };
-        toast.loading('Extrayendo datos y creando ruta...', { id: loadingToast });
-      } catch (locErr) {
-        console.warn('Geolocation failed', locErr);
-        toast.loading('Analizando sin ubicación precisa...', { id: loadingToast });
-        // We proceed without location (it will fallback in Gemini prompt)
-      }
-
       const base64Images = images.map(img => ({
         mimeType: 'image/jpeg',
         data: img.dataUrl.split(',')[1] // Strip "data:image/jpeg;base64," prefix for API
       }));
 
-      const result = await processLogisticsData(base64Images, financialText, userLocation);
+      const result = await processLogisticsData(base64Images, financialText);
+      
+      // Strict last-4 digit folio validation
+      const capturedFolios: {folio: string, client: string, last4: string}[] = [];
+      (result.orders || []).forEach((o: any) => {
+        const parts = String(o.orderNumber).split(/[,\s&]+/);
+        parts.forEach(p => {
+          const numMatch = p.match(/\d+/g);
+          if (numMatch) {
+            const numOnly = numMatch.join('');
+            if (numOnly.length >= 4) {
+              capturedFolios.push({
+                folio: p,
+                client: o.clientName || 'Desconocido',
+                last4: numOnly.slice(-4)
+              });
+            }
+          }
+        });
+      });
+
+      const financialLines: string[] = [];
+      const financialFolios: string[] = [];
+      financialText.split('\n').forEach((line: string) => {
+        if (!line.trim()) return;
+        financialLines.push(line.trim());
+        // Extraemos solo el primer número de 4 dígitos como folio financiero válido
+        const folioMatch = line.match(/\d{4}/);
+        if (folioMatch) {
+          financialFolios.push(folioMatch[0]);
+        }
+      });
+
+      const missingFin = capturedFolios.filter(c => !financialFolios.includes(c.last4)).map(c => `${c.folio} (..${c.last4})`);
+      const missingCap = financialFolios.filter(f => !capturedFolios.some(c => c.last4 === f));
+
+      if (missingFin.length > 0 || missingCap.length > 0) {
+        toast.dismiss(loadingToast);
+        setMismatchData({
+          capturedFolios: capturedFolios,
+          financialFolios: financialLines, // Display all lines that were parsed
+          missingInFinance: missingFin,
+          missingInCaptures: missingCap
+        });
+        setShowMismatchModal(true);
+        toast.error("Advertencia: Conflictos de folios detectados.");
+        return;
+      }
+
       toast.dismiss(loadingToast);
       toast.success('¡Ruta generada y optimizada con éxito!');
       onProcessed(result);
     } catch (error: any) {
       toast.dismiss(loadingToast);
-      toast.error('Hubo un error procesando los datos. ' + (error.message || ''));
+      const errorMessage = error.message || '';
       console.error(error);
+      
+      if (
+        errorMessage.includes("API key expired") ||
+        errorMessage.includes("API_KEY_INVALID") ||
+        errorMessage.includes("La clave API de Google AI Studio") ||
+        errorMessage.includes("vencida") ||
+        errorMessage.includes("expirado") ||
+        errorMessage.includes("inválida")
+      ) {
+        toast((t) => (
+          <div className="flex flex-col gap-2 p-1.5 text-left max-w-xs">
+            <span className="font-bold text-red-600 dark:text-red-400 text-sm">Error de clave API de Gemini</span>
+            <span className="text-xs text-gray-600 dark:text-gray-300">
+              La clave de la plataforma ha vencido o es inválida. ¿Deseas usar una ruta de simulación totalmente funcional para evaluar el resto del sistema, o agregar tu propia clave?
+            </span>
+            <div className="flex gap-2.5 mt-2">
+              <button 
+                onClick={() => {
+                  toast.dismiss(t.id);
+                }} 
+                className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-1.5 px-3 rounded-lg text-xs cursor-pointer transition-all"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        ), { duration: 12000, id: 'gemini-key-expired-toast' });
+      } else {
+        toast.error('Hubo un error procesando los datos. ' + errorMessage);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -270,8 +336,8 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
         </button>
         <button
           onClick={handleProcess}
-          disabled={isProcessing || images.length === 0}
-          className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl font-bold text-base shadow-md transition-all flex items-center justify-center gap-2"
+          disabled={isProcessing || images.length === 0 || !financialText.trim()}
+          className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base shadow-md transition-all flex items-center justify-center gap-2"
         >
           {isProcessing ? (
             <>
@@ -283,6 +349,86 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
           )}
         </button>
       </div>
+
+
+      {/* Mismatch Warning Modal */}
+      {showMismatchModal && mismatchData && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-red-50 dark:bg-red-950/10">
+              <h3 className="text-lg font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                <AlertCircle className="w-6 h-6 text-red-500 shrink-0" />
+                Error: Folios No Coinciden
+              </h3>
+              <button 
+                onClick={() => setShowMismatchModal(false)} 
+                className="p-1 px-2.5 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold rounded-lg transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-4">
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                No se puede proceder con la generación de la ruta porque los folios de las capturas de pantalla no coinciden con los folios de los datos financieros.
+              </p>
+              
+              <div className="space-y-3.5 pt-2">
+                <div className="bg-red-50/50 dark:bg-red-950/5 p-3 rounded-xl border border-red-100 dark:border-red-900/40">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-wider mb-2">Resumen de Análisis</h4>
+                  <ul className="text-xs space-y-2 text-gray-600 dark:text-gray-400">
+                    {mismatchData.missingInFinance.length > 0 && (
+                      <li className="flex items-start gap-1">
+                        <span className="text-red-500 font-bold shrink-0">•</span>
+                        <span>Capturas con folios <strong className="text-red-600 dark:text-red-400">({mismatchData.missingInFinance.join(', ')})</strong> no tienen renglón financiero correspondiente.</span>
+                      </li>
+                    )}
+                    {mismatchData.missingInCaptures.length > 0 && (
+                      <li className="flex items-start gap-1">
+                        <span className="text-red-500 font-bold shrink-0">•</span>
+                        <span>Líneas financieras con folios <strong className="text-red-600 dark:text-red-400">({mismatchData.missingInCaptures.join(', ')})</strong> no coinciden con ninguna captura subida.</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-gray-50 dark:bg-gray-900/30 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Capturas ({mismatchData.capturedFolios.length})</h5>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto font-mono text-xs">
+                      {mismatchData.capturedFolios.map((c, i) => (
+                        <div key={i} className={`p-1.5 rounded ${mismatchData.missingInFinance.includes(c.folio) ? "bg-red-100/50 text-red-800 dark:bg-red-950/25 dark:text-red-400 font-bold" : "text-gray-700 dark:text-gray-300"}`}>
+                          #{c.folio} - {c.client.slice(0, 10)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-gray-900/30 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <h5 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Financiero ({mismatchData.financialFolios.length})</h5>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto font-mono text-xs">
+                      {mismatchData.financialFolios.map((f, i) => (
+                        <div key={i} className={`p-1.5 rounded ${mismatchData.missingInCaptures.includes(f) ? "bg-red-100/50 text-red-800 dark:bg-red-950/25 dark:text-red-400 font-bold" : "text-gray-700 dark:text-gray-300"}`}>
+                          #{f}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 flex justify-end">
+              <button 
+                onClick={() => setShowMismatchModal(false)}
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-md focus:outline-none"
+              >
+                Corregir mis datos
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

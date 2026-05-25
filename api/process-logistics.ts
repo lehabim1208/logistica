@@ -27,9 +27,10 @@ export default async function handler(req: any, res: any) {
               paymentMethod: { type: Type.STRING },
               trCode: { type: Type.STRING },
               comments: { type: Type.STRING },
-              isAmbiguous: { type: Type.BOOLEAN }
+              isAmbiguous: { type: Type.BOOLEAN },
+              deliveryTime: { type: Type.STRING, description: "Hora de entrega pactada o programada visible en la captura (ej. '14:30', '18:15'). Si no se encuentra, poner 'No especificada'." }
             },
-            required: ["orderNumber", "last4", "clientName", "address", "amount", "paymentMethod", "trCode", "comments", "isAmbiguous"]
+            required: ["orderNumber", "last4", "clientName", "address", "amount", "paymentMethod", "trCode", "comments", "isAmbiguous", "deliveryTime"]
           }
         },
         totalDistanceEst: { type: Type.STRING, description: "Calcula y estima la distancia total aproximada según las direcciones (ej. '15 km'). Trata de dar una estimación lógica de la ciudad." },

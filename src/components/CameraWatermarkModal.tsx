@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { X, SwitchCamera, Circle, Clock, MapPin, CalendarDays } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface CameraWatermarkModalProps {
   onClose: () => void;
@@ -15,7 +15,13 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
   const [address, setAddress] = useState('Obteniendo ubicación...');
   const [customTime, setCustomTime] = useState('');
   const [useCustomTime, setUseCustomTime] = useState(false);
-  const [customName, setCustomName] = useState('');
+  const [customName, setCustomName] = useState(() => {
+    return localStorage.getItem('logiruta_camera_name') || '';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('logiruta_camera_name', customName);
+  }, [customName]);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Get location
@@ -264,12 +270,6 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
     
     if (onCapture) {
       onCapture(dataUrl);
-    } else {
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = `foto_${Date.now()}.jpg`;
-      a.click();
-      toast.success('Foto guardada');
     }
   };
 

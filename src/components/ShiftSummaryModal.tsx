@@ -4,11 +4,12 @@ import { ChevronDown, ChevronUp, Package, Map as MapIcon, Clock } from 'lucide-r
 interface ShiftSummaryModalProps {
   totalFund: number;
   fundHistory: any[];
+  tpvNumber: string;
   onFinish: () => void;
   onCancel: () => void;
 }
 
-export function ShiftSummaryModal({ totalFund, fundHistory, onFinish, onCancel }: ShiftSummaryModalProps) {
+export function ShiftSummaryModal({ totalFund, fundHistory, tpvNumber, onFinish, onCancel }: ShiftSummaryModalProps) {
   const [showFundHistory, setShowFundHistory] = useState(false);
   const [showTrips, setShowTrips] = useState(false);
 
@@ -16,11 +17,47 @@ export function ShiftSummaryModal({ totalFund, fundHistory, onFinish, onCancel }
   const historyStr = localStorage.getItem('logiruta_history');
   const allHistory = historyStr ? JSON.parse(historyStr) : [];
   
-  // Filter for today's trips (crude filter by date part matching today's local date part)
+  // Filter for today's trips
   const todayStr = new Date().toLocaleDateString();
   const todayTrips = allHistory.filter((h: any) => {
     return new Date(h.date).toLocaleDateString() === todayStr;
   });
+
+  const startTime = localStorage.getItem('logiruta_start_time') || '';
+  const endTime = localStorage.getItem('logiruta_end_time') || '';
+
+  const format12h = (time24: string) => {
+    if (!time24) return 'No registrado';
+    try {
+      const [h, m] = time24.split(':');
+      let hour = parseInt(h, 10);
+      const ampm = hour >= 12 ? 'p.m.' : 'a.m.';
+      hour = hour % 12;
+      if (hour === 0) hour = 12;
+      return `${hour}:${m} ${ampm}`;
+    } catch {
+      return time24;
+    }
+  };
+
+  const getWorkHours = (start: string, end: string) => {
+    if (!start || !end) return '';
+    try {
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      let sMinutes = sh * 60 + sm;
+      let eMinutes = eh * 60 + em;
+      if (eMinutes < sMinutes) {
+        eMinutes += 24 * 60; // crossover midnight
+      }
+      const diffMinutes = eMinutes - sMinutes;
+      const hours = Math.floor(diffMinutes / 60);
+      const mins = diffMinutes % 60;
+      return `${hours}h ${mins}m`;
+    } catch (e) {
+      return '';
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in">
@@ -36,6 +73,36 @@ export function ShiftSummaryModal({ totalFund, fundHistory, onFinish, onCancel }
           <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl p-5 border border-green-100 dark:border-green-800/30 text-center space-y-1">
             <p className="text-sm font-semibold text-green-800 dark:text-green-500 uppercase tracking-wide">Fondo a entregar</p>
             <p className="text-4xl font-black text-green-600 dark:text-green-400">${totalFund.toFixed(2)}</p>
+          </div>
+
+          {/* Reporte de Diagnostico de la Jornada */}
+          <div className="bg-gray-50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 space-y-3.5 text-sm">
+            <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800/60 pb-2">
+              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">TPV asignado</span>
+              <span className="font-bold text-gray-900 dark:text-white">{tpvNumber || 'No asignada'}</span>
+            </div>
+            <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800/60 pb-2">
+              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Horario de jornada</span>
+              <div className="flex flex-col items-end leading-tight text-right select-none">
+                <span className="font-extrabold text-green-600 dark:text-green-400 text-xs">{format12h(startTime)}</span>
+                <span className="font-extrabold text-red-500 dark:text-red-400 text-xs">{format12h(endTime)}</span>
+              </div>
+            </div>
+            <div className="space-y-2 pt-1">
+              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block">Resumen de rutas de hoy</span>
+              {todayTrips.length > 0 ? (
+                <div className="space-y-2">
+                  {todayTrips.map((trip: any, idx: number) => (
+                    <div key={idx} className="flex justify-between items-center bg-white dark:bg-gray-800 px-3 py-2 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                      <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Ruta #{idx + 1} ({trip.route?.totalDistanceEst || 'N/A'})</span>
+                      <span className="text-xs font-black text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-0.5 rounded-full">{trip.route?.orders?.length || 0} pedidos</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 dark:text-gray-500 italic">No se completaron rutas el día de hoy.</p>
+              )}
+            </div>
           </div>
 
           {/* Accordion: Fund History */}

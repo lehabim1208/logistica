@@ -15,8 +15,8 @@ export default defineConfig(({mode}) => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon-192x192.png', 'icon-512x512.png'],
         manifest: {
           id: '/',
-          name: 'NextRoute - Logística Inteligente',
-          short_name: 'NextRoute',
+          name: 'LogiRuta - Logística Inteligente',
+          short_name: 'LogiRuta',
           description: 'Sistema de logística optimizado con Inteligencia Artificial para repartidores.',
           theme_color: '#2563eb',
           background_color: '#ffffff',
@@ -66,7 +66,7 @@ export default defineConfig(({mode}) => {
           ]
         },
         devOptions: {
-          enabled: true,
+          enabled: false,
           type: 'module'
         },
         workbox: {

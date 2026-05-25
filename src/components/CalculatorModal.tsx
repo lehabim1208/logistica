@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Delete } from 'lucide-react';
 
 interface CalculatorModalProps {
@@ -6,41 +6,72 @@ interface CalculatorModalProps {
 }
 
 export function CalculatorModal({ onClose }: CalculatorModalProps) {
-  const [display, setDisplay] = useState('0');
-  const [equation, setEquation] = useState('');
+  const [display, setDisplay] = useState(() => {
+    return localStorage.getItem('logiruta_calc_display') || '0';
+  });
+  const [equation, setEquation] = useState(() => {
+    return localStorage.getItem('logiruta_calc_equation') || '';
+  });
   const [isNewValue, setIsNewValue] = useState(false);
+
+  // Sync state to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem('logiruta_calc_display', display || '0');
+    localStorage.setItem('logiruta_calc_equation', equation || '');
+  }, [display, equation]);
 
   const calculate = (expr: string) => {
     try {
-      // Replace % with /100 and evaluate safely
-      // A full regex for percentage calculations like 50 + 10%
-      let modifiedExpr = expr;
+      // Clean up spaces and normalize operators
+      let clean = expr.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/');
       
-      // Basic safe eval function using Function
-      const safeEval = new Function('return ' + modifiedExpr.replace(/[^0-9+\-*/.()]/g, ''));
+      // Match pattern for X [op] Y % at the end of the expression
+      // e.g. "900-10%" or "500+15%"
+      const percentMatch = clean.match(/^([\d.]+)([+\-*/])([\d.]+)%$/);
+      if (percentMatch) {
+        const x = parseFloat(percentMatch[1]);
+        const op = percentMatch[2];
+        const y = parseFloat(percentMatch[3]);
+        if (!isNaN(x) && !isNaN(y)) {
+          let result = 0;
+          if (op === '+') {
+            result = x + (x * y / 100);
+          } else if (op === '-') {
+            result = x - (x * y / 100);
+          } else if (op === '*') {
+            result = x * (y / 100);
+          } else if (op === '/') {
+            result = x / (y / 100);
+          }
+          return parseFloat(result.toPrecision(12)).toString();
+        }
+      }
+      
+      // Fallback: If it's just Y% (like "15%")
+      const simplePercent = clean.match(/^([\d.]+)%$/);
+      if (simplePercent) {
+        const val = parseFloat(simplePercent[1]);
+        if (!isNaN(val)) return (val / 100).toString();
+      }
+
+      // Replace standard percent blocks with /100 division
+      let replaced = clean.replace(/([\d.]+)%/g, '($1/100)');
+      
+      // Basic safe evaluation
+      const safeEval = new Function('return ' + replaced.replace(/[^0-9+\-*/.()]/g, ''));
       const result = safeEval();
       
       if (!isFinite(result) || isNaN(result)) return 'Error';
-      
       return parseFloat(result.toPrecision(12)).toString();
     } catch {
       return 'Error';
     }
   };
 
-  const calculatePercentage = () => {
-     try {
-       // Only handles x% = x/100 right now for simplicity on mobile calc
-       const val = parseFloat(display);
-       if (!isNaN(val)) {
-         setDisplay((val / 100).toString());
-       }
-     } catch {}
-  };
-
   const handleInput = (val: string) => {
     if (display === 'Error') {
-      setDisplay(val);
+      setDisplay(val === 'C' ? '0' : val);
+      setEquation('');
       setIsNewValue(false);
       return;
     }
@@ -81,7 +112,10 @@ export function CalculatorModal({ onClose }: CalculatorModalProps) {
     }
 
     if (val === '%') {
-       calculatePercentage();
+       // Append percent sign to current display number
+       if (display !== '0' && !display.includes('%')) {
+         setDisplay(prev => prev + '%');
+       }
        return;
     }
     
@@ -108,7 +142,7 @@ export function CalculatorModal({ onClose }: CalculatorModalProps) {
         </div>
 
         <div className="p-6 pt-2 pb-6 flex flex-col items-end justify-end space-y-1">
-          <div className="text-gray-400 text-lg h-6 font-medium">{equation.replace('*', '×').replace('/', '÷')}</div>
+          <div className="text-gray-400 text-lg h-6 font-medium">{equation.replace(/\*/g, '×').replace(/\//g, '÷')}</div>
           <div className="text-white text-5xl font-light tracking-tight truncate w-full text-right">{display}</div>
         </div>
 

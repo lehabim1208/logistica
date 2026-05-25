@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ProcessingResult } from '../lib/gemini';
 import { ArrowLeft, Clock, Map as MapIcon, Package, Eye, X, CheckCircle, CreditCard, Receipt, User, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface HistoryItem {
   date: string;
@@ -13,6 +13,7 @@ export function HistoryView({ onBack, hideHeader }: { onBack: () => void, hideHe
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [dateToDelete, setDateToDelete] = useState<string | null>(null);
+  const [expandedClientInfo, setExpandedClientInfo] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const data = localStorage.getItem('logiruta_history');
@@ -193,6 +194,44 @@ export function HistoryView({ onBack, hideHeader }: { onBack: () => void, hideHe
                   </div>
                   
                   <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">{order.address}</p>
+
+                  {/* Expandable Accordion for Client Info */}
+                  <div className="mb-3 border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden bg-gray-50/50 dark:bg-gray-900/30">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedClientInfo(prev => ({ ...prev, [order.id]: !prev[order.id] }))}
+                      className="w-full flex justify-between items-center px-3 py-2 text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 pointer-events-auto"
+                    >
+                      <span>{expandedClientInfo[order.id] ? "Ocultar Información Adicional ▲" : "Información Adicional ▼"}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">Detalles</span>
+                    </button>
+                    {expandedClientInfo[order.id] && (
+                      <div className="px-3 pb-3 pt-1 text-xs space-y-1.5 border-t border-gray-100 dark:border-gray-800 animate-in fade-in duration-150">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-gray-400 shrink-0 font-medium">Nombre Completo:</span>
+                          <span className="font-semibold text-gray-800 dark:text-gray-200 text-right leading-tight">{order.clientName}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-400 font-medium">Teléfono:</span>
+                          <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
+                            {order.phone && order.phone !== 'No se proporcionó' && order.phone !== 'No disponible' ? (
+                              <a href={`tel:${order.phone}`} className="hover:underline text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                {order.phone}
+                              </a>
+                            ) : (
+                              'No especificado'
+                            )}
+                          </span>
+                        </div>
+                        {order.deliveredAt && (
+                          <div className="flex justify-between items-center mt-1 pt-1 border-t border-gray-100 dark:border-gray-800">
+                            <span className="text-gray-400 flex items-center gap-1 font-medium"><Clock className="w-3 h-3" /> Hora de Entrega:</span>
+                            <span className="font-semibold text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">{order.deliveredAt}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {order.subOrders && order.subOrders.length > 0 && (
                     <div className="mb-3 p-2 bg-gray-100/50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-2">
