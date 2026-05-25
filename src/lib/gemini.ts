@@ -40,7 +40,7 @@ export async function processLogisticsData(imagesBase64: { mimeType: string, dat
   };
 
   const customKey = localStorage.getItem('logiruta_custom_gemini_api_key');
-  if (customKey && customKey.trim()) {
+  if (customKey && customKey.trim() && customKey !== 'AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY') {
     headers['x-gemini-api-key'] = customKey.trim();
   }
 

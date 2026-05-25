@@ -109,10 +109,8 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [customGeminiKey, setCustomGeminiKey] = useState(() => {
     const saved = localStorage.getItem('logiruta_custom_gemini_api_key');
-    if (saved) return saved;
-    const defaultKey = 'AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY';
-    localStorage.setItem('logiruta_custom_gemini_api_key', defaultKey);
-    return defaultKey;
+    if (saved && saved !== 'AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY') return saved;
+    return '';
   });
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('logiruta_theme');

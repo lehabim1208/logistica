@@ -18,10 +18,12 @@ async function startServer() {
       const { imagesBase64, financialText } = req.body;
       const rawApiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
       let clientApiKey = Array.isArray(rawApiKey) ? rawApiKey[0] : (rawApiKey || "");
+      if (clientApiKey === "AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY") {
+        clientApiKey = process.env.GEMINI_API_KEY || "";
+      }
       
-      const backupKey = "AIzaSyBlncNsXg3OghqzPiWo7_sqpASFN10swMY";
       if (!clientApiKey || clientApiKey === "MY_GEMINI_API_KEY" || clientApiKey.trim() === "") {
-        clientApiKey = backupKey;
+        return res.status(401).json({ error: "No se encontró API Key. Configura GEMINI_API_KEY en Vercel o en las variables de entorno, o ingrésala en la app." });
       }
 
       let activeAi = new GoogleGenAI({ apiKey: clientApiKey });
