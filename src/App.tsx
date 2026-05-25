@@ -13,7 +13,7 @@ import { ShiftSummaryModal } from './components/ShiftSummaryModal';
 import { NotesModal } from './components/NotesModal';
 import { CalculatorModal } from './components/CalculatorModal';
 import { ProcessingResult } from './lib/gemini';
-import { Package, Clock, History, Map as MapIcon, Wallet, Camera, Settings, Moon, Sun, Monitor, StickyNote, Calculator, X, Cloud, CloudOff, Loader2, Check, RefreshCw } from 'lucide-react';
+import { Package, Clock, History, Map as MapIcon, Wallet, Camera, Settings, Moon, Sun, Monitor, StickyNote, Calculator, X, Cloud, CloudOff, Loader2, Check } from 'lucide-react';
 import localforage from 'localforage';
 
 export type AppState = 'home' | 'input' | 'phone-input' | 'review' | 'delivering';
@@ -262,7 +262,12 @@ export default function App() {
   if (!isLoaded) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.98, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300"
+    >
       <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-gray-800 shadow-xl relative">
         
         <Toaster position="top-center" closeButton richColors />
@@ -303,13 +308,6 @@ export default function App() {
                   </div>
                 </div>
                  <div className="flex items-center gap-2 select-none py-1 shrink-0">
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="flex justify-center items-center p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm mr-1"
-                    title="Recargar página"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                  </button>
                   <div 
                     className="flex items-center gap-1.5 cursor-pointer bg-green-50 dark:bg-green-900/30 px-2.5 py-1.5 rounded-lg border border-green-200 dark:border-green-800/40 hover:bg-green-100 dark:hover:bg-green-900/50 transition-all active:scale-95 shrink-0"
                     onClick={() => setShowFundModal(true)}
@@ -845,6 +843,6 @@ export default function App() {
           />
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
