@@ -385,29 +385,6 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
       ) : mode === 'manual' ? (
         // Manual mode flow (original upload captures + financial text)
         <div className="space-y-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xs">
-            <div>
-              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Ingreso del viaje</span>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                <FileText className="w-5 h-5 text-blue-500" />
-                Modo de ingreso: Manual
-              </h2>
-            </div>
-            <button
-              onClick={() => {
-                setMode(null);
-                setImages([]);
-                setFinancialText('');
-                localStorage.removeItem('logiruta_input_mode');
-                localforage.removeItem('logiruta_images');
-                localforage.removeItem('logiruta_text');
-                onClearRoute?.();
-              }}
-              className="text-xs font-bold text-blue-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg flex items-center gap-1 self-start sm:self-center cursor-pointer"
-            >
-              ← Cambiar de modo
-            </button>
-          </div>
 
           <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2">
@@ -506,31 +483,27 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
               )}
             </button>
           </div>
-        </div>
-      ) : (
-        // Image mode flow (New! Double capture pair layout per order)
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xs">
-            <div>
-              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Ingreso del viaje</span>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                <ImageIcon className="w-5 h-5 text-emerald-500" />
-                Modo de ingreso: Imagen (OCR)
-              </h2>
-            </div>
+
+          <div className="flex justify-center pt-2">
             <button
               onClick={() => {
                 setMode(null);
-                setImageRows([{ id: crypto.randomUUID(), orderImage: null, financialImage: null }]);
+                setImages([]);
+                setFinancialText('');
                 localStorage.removeItem('logiruta_input_mode');
-                localforage.removeItem('logiruta_image_rows');
+                localforage.removeItem('logiruta_images');
+                localforage.removeItem('logiruta_text');
                 onClearRoute?.();
               }}
-              className="text-xs font-bold text-blue-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg flex items-center gap-1 self-start sm:self-center cursor-pointer"
+              className="text-xs font-bold text-blue-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2.5 rounded-lg flex items-center gap-1 cursor-pointer"
             >
               ← Cambiar de modo
             </button>
           </div>
+        </div>
+      ) : (
+        // Image mode flow (New! Double capture pair layout per order)
+        <div className="space-y-6">
 
           <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-xs space-y-4">
             <div className="space-y-1">
@@ -681,6 +654,21 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
               ) : (
                 'Procesar fotos de viaje'
               )}
+            </button>
+          </div>
+
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => {
+                setMode(null);
+                setImageRows([{ id: crypto.randomUUID(), orderImage: null, financialImage: null }]);
+                localStorage.removeItem('logiruta_input_mode');
+                localforage.removeItem('logiruta_image_rows');
+                onClearRoute?.();
+              }}
+              className="text-xs font-bold text-blue-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2.5 rounded-lg flex items-center gap-1 cursor-pointer"
+            >
+              ← Cambiar de modo
             </button>
           </div>
         </div>

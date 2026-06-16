@@ -468,8 +468,13 @@ export default function App() {
                     // Clear active route state to prevent going back to finished route
                     setRouteInfo(null);
                     setCurrentIndex(0);
+                    
+                    // Reset mode, state and all inputs
+                    localStorage.removeItem('logiruta_input_mode');
+                    localStorage.removeItem('logiruta_state');
                     localforage.removeItem('logiruta_images').catch(console.error);
                     localforage.removeItem('logiruta_text').catch(console.error);
+                    localforage.removeItem('logiruta_image_rows').catch(console.error);
                     localforage.removeItem('logiruta_state').catch(console.error);
                     
                     setAppState('input');
