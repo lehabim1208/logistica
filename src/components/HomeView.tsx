@@ -54,7 +54,7 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[65vh] py-8 px-4 overflow-hidden">
+    <div className="flex flex-col items-center justify-center w-full py-4 px-4 overflow-hidden">
       <div className={`w-full max-w-sm flex flex-col items-center text-center ${showFundInput ? 'space-y-4' : 'space-y-8'}`}>
         
         <motion.div 
@@ -209,7 +209,7 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
                 className="py-2.5 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-all flex justify-center items-center gap-2 text-xs font-bold border border-dashed border-gray-200 dark:border-gray-700/80 hover:border-solid hover:border-blue-500 rounded-xl w-full text-center"
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span>Cámara de Agua</span>
+                <span>Cámara</span>
               </motion.button>
             )}
           </div>

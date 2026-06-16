@@ -261,7 +261,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
-      <div className="max-w-md mx-auto min-h-screen bg-white dark:bg-gray-800 shadow-xl relative">
+      <div className={`max-w-md mx-auto min-h-screen bg-white dark:bg-gray-800 shadow-xl relative flex flex-col ${appState === 'home' ? 'max-h-screen overflow-hidden' : ''}`}>
         
         <Toaster position="top-center" richColors swipeDirections={['left', 'right']} />
         
@@ -370,7 +370,7 @@ export default function App() {
         )}
 
         {/* Main Content Area */}
-        <main className="w-full pb-24">
+        <main className={`w-full flex-1 flex flex-col justify-center ${appState === 'home' ? 'max-h-screen overflow-hidden' : 'pb-24'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={appState}
