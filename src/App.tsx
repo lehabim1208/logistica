@@ -266,41 +266,35 @@ export default function App() {
         <Toaster position="top-center" richColors swipeDirections={['left', 'right']} />
         
         {/* Header / Nav */}
-        <AnimatePresence>
-          {appState !== 'home' && (
-            <motion.header 
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-300"
-            >
-              <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between gap-1.5 overflow-x-hidden">
-                <div className="flex items-center gap-2 cursor-default shrink-0">
-                  <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-500/20">
-                    <Package className="w-4.5 h-4.5" />
-                  </div>
-                  <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white hidden xs:block">LogiRuta<span className="text-blue-600 dark:text-blue-400">.</span></span>
-                  <div className="ml-1 flex items-center justify-center relative w-7 h-7 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700" title={!isOnline ? "Trabajando sin conexión" : isReconnecting ? "Reconectando..." : "Conectado"}>
-                    {!isOnline ? (
-                       <>
-                         <CloudOff className="w-3.5 h-3.5 text-red-500 relative z-0" />
-                         <X className="w-2.5 h-2.5 text-red-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
-                       </>
-                    ) : isReconnecting ? (
-                       <>
-                         <Cloud className="w-3.5 h-3.5 text-blue-500 relative z-0" />
-                         <Loader2 className="w-2.5 h-2.5 text-blue-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full animate-spin" strokeWidth={3} />
-                       </>
-                    ) : (
-                       <>
-                         <Cloud className="w-3.5 h-3.5 text-green-500 relative z-0" />
-                         <Check className="w-2.5 h-2.5 text-green-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
-                       </>
-                    )}
-                  </div>
-                </div>
-                 <div className="flex items-center gap-2 select-none py-1 shrink-0">
+        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 transition-colors duration-300">
+          <div className="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between gap-1.5 overflow-x-hidden">
+            <div className="flex items-center gap-2 cursor-default shrink-0">
+              <div className="bg-blue-600 p-1.5 rounded-lg text-white shadow-lg shadow-blue-500/20">
+                <Package className="w-4.5 h-4.5" />
+              </div>
+              <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white hidden xs:block">LogiRuta<span className="text-blue-600 dark:text-blue-400">.</span></span>
+              <div className="ml-1 flex items-center justify-center relative w-7 h-7 rounded-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700" title={!isOnline ? "Trabajando sin conexión" : isReconnecting ? "Reconectando..." : "Conectado"}>
+                {!isOnline ? (
+                   <>
+                     <CloudOff className="w-3.5 h-3.5 text-red-500 relative z-0" />
+                     <X className="w-2.5 h-2.5 text-red-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
+                   </>
+                ) : isReconnecting ? (
+                   <>
+                     <Cloud className="w-3.5 h-3.5 text-blue-500 relative z-0" />
+                     <Loader2 className="w-2.5 h-2.5 text-blue-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full animate-spin" strokeWidth={3} />
+                   </>
+                ) : (
+                   <>
+                     <Cloud className="w-3.5 h-3.5 text-green-500 relative z-0" />
+                     <Check className="w-2.5 h-2.5 text-green-600 absolute bottom-0.5 right-0.5 bg-white dark:bg-gray-800 rounded-full" strokeWidth={3} />
+                   </>
+                )}
+              </div>
+            </div>
+             <div className="flex items-center gap-2 select-none py-1 shrink-0">
+              {isBoxOpen && (
+                <>
                   <div 
                     className="flex items-center gap-1.5 cursor-pointer bg-green-50 dark:bg-green-900/30 px-2.5 py-1.5 rounded-lg border border-green-200 dark:border-green-800/40 hover:bg-green-100 dark:hover:bg-green-900/50 transition-all active:scale-95 shrink-0"
                     onClick={() => setShowFundModal(true)}
@@ -324,54 +318,54 @@ export default function App() {
                      <span className="text-[10px] font-black text-blue-800 dark:text-blue-400 uppercase tracking-tighter hidden sm:inline">TPV</span>
                      <span className="font-extrabold text-blue-700 dark:text-blue-400 text-xs text-nowrap">{tpvNumber || '--'}</span>
                   </div>
-    
-                  <button 
-                    onClick={() => {
-                      setPendingPhotoFn(null); 
-                      setShowCameraModal(true);
-                    }}
-                    className="p-1.5 text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-all active:scale-95 flex items-center justify-center border border-blue-200 dark:border-blue-800/40 shrink-0"
-                    title="Cámara"
-                  >
-                    <Camera className="w-4 h-4" />
-                  </button>
-    
-                  <button 
-                    onClick={() => setShowSettingsModal(true)}
-                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
-                    aria-label="Ajustes"
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
-                  
-                  <button 
-                    onClick={() => setShowHistoryModal(true)}
-                    className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
-                    aria-label="Ver historial"
-                  >
-                    <History className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
+                </>
+              )}
+
+              <button 
+                onClick={() => {
+                  setPendingPhotoFn(null); 
+                  setShowCameraModal(true);
+                }}
+                className="p-1.5 text-blue-800 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-all active:scale-95 flex items-center justify-center border border-blue-200 dark:border-blue-800/40 shrink-0"
+                title="Cámara"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+
+              <button 
+                onClick={() => setShowSettingsModal(true)}
+                className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
+                aria-label="Ajustes"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
               
-              {/* Mobile bottom tools bar */}
-              <div className="flex sm:hidden justify-center items-center py-2 gap-3 px-4 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
-                 <button 
-                    onClick={() => setShowNotesModal(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 flex-1 text-sm font-bold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl border border-sky-200/50 dark:border-sky-800/30 transition-all active:scale-95"
-                  >
-                    <StickyNote className="w-4.5 h-4.5" /> Notas
-                  </button>
-                  <button 
-                    onClick={() => setShowCalculatorModal(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 flex-1 text-sm font-bold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl border border-sky-200/50 dark:border-sky-800/30 transition-all active:scale-95"
-                  >
-                    <Calculator className="w-4.5 h-4.5" /> Calculadora
-                  </button>
-              </div>
-            </motion.header>
-          )}
-        </AnimatePresence>
+              <button 
+                onClick={() => setShowHistoryModal(true)}
+                className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all active:scale-95 flex items-center justify-center shrink-0 border border-gray-200 dark:border-gray-700"
+                aria-label="Ver historial"
+              >
+                <History className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          
+          {/* Mobile bottom tools bar */}
+          <div className="flex sm:hidden justify-center items-center py-2 gap-3 px-4 bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
+             <button 
+                onClick={() => setShowNotesModal(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 flex-1 text-sm font-bold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl border border-sky-200/50 dark:border-sky-800/30 transition-all active:scale-95"
+              >
+                <StickyNote className="w-4.5 h-4.5" /> Notas
+              </button>
+              <button 
+                onClick={() => setShowCalculatorModal(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 flex-1 text-sm font-bold text-sky-700 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-900/20 rounded-2xl border border-sky-200/50 dark:border-sky-800/30 transition-all active:scale-95"
+              >
+                <Calculator className="w-4.5 h-4.5" /> Calculadora
+              </button>
+          </div>
+        </header>
 
         {/* Main Content Area */}
         <main className="w-full pb-24">
@@ -397,6 +391,10 @@ export default function App() {
                   }}
                   onViewHistory={() => setShowHistoryModal(true)}
                   onViewNotes={() => setShowNotesModal(true)}
+                  onOpenCamera={() => {
+                    setPendingPhotoFn(null);
+                    setShowCameraModal(true);
+                  }}
                 />
               )}
               {appState === 'input' && (
@@ -440,6 +438,9 @@ export default function App() {
                   currentIndex={currentIndex}
                   onIndexChange={setCurrentIndex}
                   onCancel={() => setAppState('review')}
+                  onRouteUpdate={(updatedRoute) => {
+                    setRouteInfo(updatedRoute);
+                  }}
                   onFinish={(updatedOrder) => {
                     let finalRouteInfo = routeInfo;
                     if (updatedOrder) {

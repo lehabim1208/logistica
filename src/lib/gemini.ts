@@ -29,10 +29,11 @@ export interface ProcessingResult {
   mismatches: string[];
 }
 
-export async function processLogisticsData(imagesBase64: { mimeType: string, data: string }[], financialText: string): Promise<ProcessingResult> {
+export async function processLogisticsData(imagesBase64: { mimeType: string, data: string }[], financialText: string, isPairMode: boolean = false): Promise<ProcessingResult> {
   const payload = {
     imagesBase64,
-    financialText
+    financialText,
+    isPairMode
   };
 
   const headers: Record<string, string> = {

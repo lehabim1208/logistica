@@ -13,7 +13,7 @@ async function startServer() {
   // API Route for Gemini
   app.post("/api/process-logistics", async (req, res) => {
     try {
-      const { imagesBase64, financialText } = req.body;
+      const { imagesBase64, financialText, isPairMode } = req.body;
       const rawApiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
       let clientApiKey = Array.isArray(rawApiKey) ? rawApiKey[0] : (rawApiKey || "");
       
@@ -48,13 +48,34 @@ async function startServer() {
           mismatches: { 
             type: Type.ARRAY, 
             items: { type: Type.STRING },
-            description: "Lista exclusiva de los códigos TR o referencias del texto que NO pudieron asociarse a ninguna orden. Si todo cuadra, devuelve un arreglo vacío. NO incluyas mensajes de error ni justificaciones aquí."
+            description: "Lista de códigos que no pudieron asociarse. Vacío en modo parejas."
           }
         },
         required: ["orders", "mismatches"]
       };
 
-      const systemInstruction = `
+      let systemInstruction = "";
+      let prompt = "";
+
+      if (isPairMode) {
+        systemInstruction = `
+ERES UN SISTEMA DE EXTRACCIÓN DE DATOS DE LOGÍSTICA ULTRA PRECISO EN MODO PAREJAS DE IMÁGENES.
+Recibes pares de fotos organizadas secuencialmente: por cada pedido hay (1) captura de información de entrega y envío, y (2) captura de información financiera del mismo pedido.
+
+REGLAS CRUCIALES PARA ENLAZAR EL PAR DE IMÁGENES DE CADA PEDIDO:
+1. Para cada pedido "i" (de 1 a N), asocia la captura de entrega (índice 2*(i-1)) con su captura financiera (índice 2*(i-1) + 1).
+2. De la primera captura (entrega): extrae el folio/número de orden EXACTO y LITERAL (orderNumber, y almacena los últimos 4 dígitos en "last4"), nombre del cliente (clientName), dirección completa (address, incluyendo calle, número, colonia, ciudad y CÓDIGO POSTAL CP si viene) y hora de entrega o "deliveryTime" si existe (ej. '14:30', '18:15'; si no, 'No especificada').
+3. De la segunda captura (financiera) vinculante:
+   - Reconoce el número de TR (trCode) y el monto.
+   - Si en "tipo de pago", "estado" o información dice "prepago" o indica que es pago electrónico/en línea, el paymentMethod será "Pago en Línea" y el monto (amount) será "$0.00".
+   - Si en "tipo de pago" o similar dice "postpago" o indica pago al recibir, debe reconocer el número de TR (trCode) e identificar el monto a cobrar de la sección de [Total] o del valor total de la imagen financiera. Su paymentMethod será "Tarjeta o Efectivo".
+4. DIRECCIÓN DE GPS: Limpia detalles del interior o referencias demasiado informales en el campo 'address' dejando solo la dirección oficial apta para Google Parks/Maps con el Código Postal.
+5. El tamaño de la respuesta 'orders' debe ser EXACTAMENTE el número de pedidos: ${imagesBase64.length / 2}. No alucines pedidos extras.
+`;
+
+        prompt = `Procesa las siguientes ${imagesBase64.length} capturas en parejas de dos imágenes por pedido. No alucines ninguna orden extra. Devuelve exactamente ${imagesBase64.length / 2} pedidos.`;
+      } else {
+        systemInstruction = `
 ERES UN SISTEMA DE EXTRACCIÓN DE DATOS ULTRA PRECISO Y RÁPIDO.
 TU ÚNICO OBJETIVO: Extraer datos principales de las imágenes y NO INVENTAR NADA.
 
@@ -69,12 +90,13 @@ REGLAS CRUCIALES (INCUMPLIRLAS ES UN ERROR CRÍTICO):
 8. Si una dirección es demasiado informal, extrae al menos la Calle principal y el Código Postal.
 `;
 
-      const prompt = `Aquí están los datos del viaje. Recibes ${imagesBase64.length} capturas.
+        prompt = `Aquí están los datos del viaje. Recibes ${imagesBase64.length} capturas.
 
 Texto financiero o extra:
 ${financialText}
 
 RECUERDA: Agrupa pedidos de la misma dirección en uno solo, y extrae los números de orden exactamente como se leen en las imágenes, sin falsificarlos.`;
+      }
 
       const parts: any[] = imagesBase64.map((img: any) => ({
         inlineData: {

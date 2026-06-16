@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ProcessingResult, Order } from '../lib/gemini';
-import { Navigation2, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, CreditCard, Receipt, Camera, User, Phone, MessageCircle, X, Plus, Ticket } from 'lucide-react';
+import { Navigation2, CheckCircle, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, MessageSquare, CreditCard, Receipt, Camera, User, Phone, MessageCircle, X, Plus, Ticket, Pencil } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { dbLocal } from '../lib/dbLocal';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ interface DeliveryViewProps {
   onPhotoRequest?: (callback: (dataUrl: string) => void) => void;
   useCustomCamera?: boolean;
   onFundChange?: (amount: number, desc: string, type: 'open' | 'add' | 'subtract' | 'close') => void;
+  onRouteUpdate?: (updatedRoute: ProcessingResult) => void;
 }
 
 function extractNumber(amountStr: string | number | undefined) {
@@ -34,7 +35,7 @@ function getGreeting() {
   return 'Buenas noches';
 }
 
-export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCancel, onIndexChange, onFundChange }: DeliveryViewProps) {
+export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCancel, onIndexChange, onFundChange, onRouteUpdate }: DeliveryViewProps) {
   const order = routeInfo?.orders?.[currentIndex];
   const [showSubOrders, setShowSubOrders] = useState(false);
   
@@ -61,6 +62,9 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
   const [isPlOverride, setIsPlOverride] = useState(false);
   const [showWaModal, setShowWaModal] = useState(false);
 
+  const [isEditingAmount, setIsEditingAmount] = useState(false);
+  const [editedAmountValue, setEditedAmountValue] = useState('');
+
   useEffect(() => {
     if (order) {
       setPaymentMode('single');
@@ -72,8 +76,41 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
       setIsPlOverride(false);
       setShowWaModal(false);
       setSplitMethods([]);
+      setIsEditingAmount(false);
+      setEditedAmountValue('');
     }
   }, [order?.id]);
+
+  const handleSaveAmount = () => {
+    if (!editedAmountValue.trim()) {
+      toast.error('Por favor ingresa un monto válido.');
+      return;
+    }
+    const updatedOrders = [...routeInfo.orders];
+    const currentOrder = updatedOrders[currentIndex];
+    
+    let formattedAmount = editedAmountValue.trim();
+    if (!formattedAmount.startsWith('$')) {
+      formattedAmount = `$${formattedAmount}`;
+    }
+    
+    updatedOrders[currentIndex] = {
+      ...currentOrder,
+      amount: formattedAmount
+    };
+    
+    const updatedRoute = {
+      ...routeInfo,
+      orders: updatedOrders
+    };
+    
+    if (onRouteUpdate) {
+      onRouteUpdate(updatedRoute);
+    }
+    
+    setIsEditingAmount(false);
+    toast.success(`Monto del pedido actualizado a ${formattedAmount}`);
+  };
 
   if (!order) return null;
 
@@ -291,7 +328,7 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
         </div>
         <div className="flex items-center gap-2">
           <div className="text-xs bg-white/20 px-2 py-0.5 rounded-md font-mono">
-            #{order.orderNumber}
+            #{String(order.orderNumber || '').slice(0, -4)}<strong className="font-extrabold text-white">{String(order.orderNumber || '').slice(-4)}</strong>
           </div>
         </div>
       </div>
@@ -371,7 +408,9 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
                   {order.subOrders.map((sub, idx) => (
                     <div key={idx} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                       <div className="flex justify-between items-start mb-1">
-                        <span className="text-xs font-mono font-bold bg-gray-100 dark:bg-gray-900 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300">Folio: {sub.orderNumber}</span>
+                        <span className="text-xs font-mono font-bold bg-gray-100 dark:bg-gray-900 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300">
+                          Folio: {String(sub.orderNumber || '').slice(0, -4)}<strong className="font-extrabold text-gray-900 dark:text-white">{String(sub.orderNumber || '').slice(-4)}</strong>
+                        </span>
                         <span className="text-xs font-bold text-blue-700 dark:text-blue-400">{sub.amount}</span>
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Pago: {sub.paymentMethod}</p>
@@ -420,11 +459,27 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
               </div>
             ) : isPaid ? (
               <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-900/50 p-3 rounded-xl space-y-2">
-                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400">
-                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-bold text-sm">📝 Pedido Pagado</h3>
-                    <p className="text-emerald-700 dark:text-emerald-500 font-medium leading-snug text-xs">Solo entregar, no recibir pago.</p>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400">
+                    <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                    <div>
+                      <h3 className="font-bold text-sm">📝 Pedido Pagado</h3>
+                      <p className="text-emerald-700 dark:text-emerald-500 font-medium leading-snug text-xs">Solo entregar, no recibir pago.</p>
+                    </div>
+                  </div>
+                  {/* Edit Amount Pencil for prepaid orders too */}
+                  <div className="flex items-center gap-1.5 bg-emerald-100/50 dark:bg-emerald-900/50 px-2 py-1 rounded-lg">
+                    <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">{order.amount}</span>
+                    <button 
+                      onClick={() => {
+                        setEditedAmountValue(String(order.amount).replace('$', ''));
+                        setIsEditingAmount(true);
+                      }}
+                      className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 transition-colors p-0.5 rounded cursor-pointer"
+                      title="Editar monto"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
                 <div className="bg-emerald-100/50 dark:bg-emerald-900/40 p-2 rounded-lg flex items-start gap-1.5 text-emerald-800 dark:text-emerald-300 text-xs font-medium">
@@ -437,7 +492,19 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-600 dark:text-gray-300 text-sm">Monto a Cobrar</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">{order.amount}</span>
+                    <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-2.5 py-1">
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">{order.amount}</span>
+                      <button 
+                        onClick={() => {
+                          setEditedAmountValue(String(order.amount).replace('$', ''));
+                          setIsEditingAmount(true);
+                        }}
+                        className="text-gray-400 hover:text-blue-500 transition-colors p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer animate-pulse"
+                        title="Editar monto"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                     <button 
                       onClick={() => setIsPlOverride(true)}
                       className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-400 px-2 py-1 rounded font-bold hover:bg-emerald-200 dark:hover:bg-emerald-900/60 transition-colors flex items-center gap-1"
@@ -763,6 +830,58 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
                 className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm text-gray-700 dark:text-gray-300"
               >
                 "📱 Hola [Nombre], [buenas tardes]. ¿Me podría compartir su ubicación?"
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Amount Modal */}
+      {isEditingAmount && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-sm flex flex-col shadow-2xl overflow-hidden border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-1.5 text-sm">
+                <Pencil className="w-5 h-5 text-blue-500" />
+                Editar monto del pedido
+              </h3>
+              <button 
+                onClick={() => setIsEditingAmount(false)} 
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Usa este campo para corregir el monto total de la entrega. El sistema actualizará los cálculos de cambio y remesas correspondientes.
+              </p>
+              <div className="relative flex items-center border border-gray-300 dark:border-gray-600 rounded-xl focus-within:ring-2 focus-within:ring-blue-500 bg-white dark:bg-gray-900">
+                <span className="pl-4 text-gray-400 font-bold">$</span>
+                <input 
+                  type="text" 
+                  value={editedAmountValue} 
+                  onChange={e => setEditedAmountValue(e.target.value)} 
+                  className="w-full p-3 pl-1 outline-none text-base font-bold bg-transparent dark:text-white" 
+                  placeholder="0.00" 
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsEditingAmount(false)}
+                className="flex-1 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-bold rounded-xl text-xs cursor-pointer transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAmount}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md cursor-pointer transition-all"
+              >
+                Guardar
               </button>
             </div>
           </div>

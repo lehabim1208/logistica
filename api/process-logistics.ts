@@ -7,7 +7,7 @@ export default async function handler(req: any, res: any) {
 
   // Aumentar el límite de payload si usa Body Parser integrado (Vercel permite hasta 4.5MB en Serverless gratuitos, tener precaución)
   try {
-    const { imagesBase64, financialText, userLocation } = req.body;
+    const { imagesBase64, financialText, isPairMode, userLocation } = req.body;
     const rawApiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
     let clientApiKey = Array.isArray(rawApiKey) ? rawApiKey[0] : (rawApiKey || "");
     
@@ -45,13 +45,34 @@ export default async function handler(req: any, res: any) {
         mismatches: { 
           type: Type.ARRAY, 
           items: { type: Type.STRING },
-          description: "Lista exclusiva de los códigos TR o referencias del texto que NO pudieron asociarse a ninguna orden. Si todo cuadra, devuelve un arreglo vacío. NO incluyas mensajes de error ni justificaciones aquí."
+          description: "Lista de códigos TR que no pudieron asociarse. Vacío en parejas."
         }
       },
       required: ["orders", "totalDistanceEst", "durationEst", "trafficCondition", "mismatches"]
     };
 
-    const systemInstruction = `
+    let systemInstruction = "";
+    let prompt = "";
+
+    if (isPairMode) {
+      systemInstruction = `
+ERES UN SISTEMA DE EXTRACCIÓN DE DATOS DE LOGÍSTICA ULTRA PRECISO EN MODO PAREJAS DE IMÁGENES.
+Recibes pares de fotos organizadas secuencialmente: por cada pedido hay (1) captura de información de entrega y envío, y (2) captura de información financiera del mismo pedido.
+
+REGLAS CRUCIALES PARA ENLAZAR EL PAR DE IMÁGENES DE CADA PEDIDO:
+1. Para cada pedido "i" (de 1 a N), asocia la captura de entrega (índice 2*(i-1)) con su captura financiera (índice 2*(i-1) + 1).
+2. De la primera captura (entrega): extrae el folio/número de orden EXACTO y LITERAL (orderNumber, y almacena los últimos 4 dígitos en "last4"), nombre del cliente (clientName), dirección completa (address, incluyendo calle, número, colonia, ciudad y CÓDIGO POSTAL CP si viene) y hora de entrega o "deliveryTime" si existe (ej. '14:30', '18:15'; si no, 'No especificada').
+3. De la segunda captura (financiera) vinculante:
+   - Reconoce el número de TR (trCode) y el monto.
+   - Si en "tipo de pago", "estado" o información dice "prepago" o indica que es pago electrónico/en línea, el paymentMethod será "Pago en Línea" y el monto (amount) será "$0.00".
+   - Si en "tipo de pago" o similar dice "postpago" o indica pago al recibir, debe reconocer el número de TR (trCode) e identificar el monto a cobrar de la sección de [Total] o del valor total de la imagen financiera. Su paymentMethod será "Tarjeta o Efectivo".
+4. DIRECCIÓN DE GPS: Limpia detalles del interior o referencias demasiado informales en el campo 'address' dejando solo la dirección oficial apta para Google Parks/Maps con el Código Postal.
+5. El tamaño de la respuesta 'orders' debe ser EXACTAMENTE el número de pedidos: ${imagesBase64.length / 2}. No alucines pedidos extras.
+`;
+
+      prompt = `Procesa las siguientes ${imagesBase64.length} capturas en parejas de dos imágenes por pedido. No alucines ninguna orden extra. Devuelve exactamente ${imagesBase64.length / 2} pedidos.`;
+    } else {
+      systemInstruction = `
 ERES UN SISTEMA DE EXTRACCIÓN DE DATOS ULTRA PRECISO Y RÁPIDO.
 TU ÚNICO OBJETIVO: Extraer datos principales de las imágenes y NO INVENTAR NADA.
 
@@ -67,7 +88,7 @@ REGLAS CRUCIALES (INCUMPLIRLAS ES UN ERROR CRÍTICO):
 6. ORDENAMIENTO EN RUTA LÓGICO: Es OBLIGATORIO ordenar la lista de pedidos empezando desde el punto más cercano a la ubicación de inicio (si la hay) o dando un orden lógico que acorte distancias de punto a punto según tu conocimiento general de la ciudad y colonias. No entregues el orden al azar. Minimiza los viajes de regreso.
 `;
 
-    const prompt = `Aquí están los datos del viaje. Recibes EXACTAMENTE ${imagesBase64.length} capturas.
+      prompt = `Aquí están los datos del viaje. Recibes EXACTAMENTE ${imagesBase64.length} capturas.
 
 Texto financiero o extra:
 ${financialText}
@@ -78,6 +99,7 @@ IMPERATIVO Y CRÍTICO:
 - Debes generar ÚNICA y EXACTAMENTE ${imagesBase64.length} elementos en el array "orders" en total. UNA ORDEN POR IMAGEN. NI UNA MÁS, NI UNA MENOS.
 - NO EXTRAIGAS NOMBRES DE OTROS LADOS, NI DEL EXTREMO FONDO.
 - No alucines historial ni datos pasados. Procesa ultra rápido, estricto a las ${imagesBase64.length} imágenes.`;
+    }
 
     const parts: any[] = imagesBase64.map((img: any) => ({
       inlineData: {

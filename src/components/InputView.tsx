@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Trash2, Loader2, ImagePlus, X, Eye, FileText, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { Upload, Trash2, Loader2, ImagePlus, X, Eye, FileText, Image as ImageIcon, AlertCircle, Plus } from 'lucide-react';
 import { processLogisticsData, ProcessingResult } from '../lib/gemini';
 import { toast } from 'sonner';
 import localforage from 'localforage';
@@ -8,6 +8,12 @@ interface InputViewProps {
   onProcessed: (result: ProcessingResult) => void;
   existingRouteInfo?: ProcessingResult | null;
   onClearRoute?: () => void;
+}
+
+interface ImageRow {
+  id: string;
+  orderImage: string | null;     // '1ra Captura' base64
+  financialImage: string | null; // '2da Captura' base64
 }
 
 const compressImage = (file: File): Promise<string> => {
@@ -57,6 +63,14 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // New trip mode state variables
+  const [mode, setMode] = useState<'manual' | 'image' | null>(null);
+  const [showSelectionModal, setShowSelectionModal] = useState(false);
+  const [imageRows, setImageRows] = useState<ImageRow[]>([
+    { id: crypto.randomUUID(), orderImage: null, financialImage: null }
+  ]);
+  const [activeUpload, setActiveUpload] = useState<{ rowIndex: number, type: 'order' | 'finance' } | null>(null);
+
   const [showMismatchModal, setShowMismatchModal] = useState(false);
   const [mismatchData, setMismatchData] = useState<{
     capturedFolios: { folio: string; client: string }[];
@@ -72,6 +86,16 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
         const savedText = await localforage.getItem<string>('logiruta_text');
         if (savedImages) setImages(savedImages);
         if (savedText) setFinancialText(savedText);
+
+        const savedMode = localStorage.getItem('logiruta_input_mode') as 'manual' | 'image' | null;
+        if (savedMode) setMode(savedMode);
+
+        const savedRows = await localforage.getItem<ImageRow[]>('logiruta_image_rows');
+        if (savedRows && savedRows.length > 0) {
+          setImageRows(savedRows);
+        } else {
+          setImageRows([{ id: crypto.randomUUID(), orderImage: null, financialImage: null }]);
+        }
       } catch (e) {
         console.error('Error loading saved data:', e);
       } finally {
@@ -85,25 +109,62 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
     if (isLoaded) {
       localforage.setItem('logiruta_images', images).catch(console.error);
       localforage.setItem('logiruta_text', financialText).catch(console.error);
+
+      if (mode) {
+        localStorage.setItem('logiruta_input_mode', mode);
+      } else {
+        localStorage.removeItem('logiruta_input_mode');
+      }
+
+      if (mode === 'image') {
+        localforage.setItem('logiruta_image_rows', imageRows).catch(console.error);
+      } else {
+        localforage.removeItem('logiruta_image_rows').catch(console.error);
+      }
     }
-  }, [images, financialText, isLoaded]);
+  }, [images, financialText, mode, imageRows, isLoaded]);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const toastId = toast.loading('Procesando imágenes...');
-      try {
-        const newImages = await Promise.all(
-          Array.from(e.target.files).map(async (file: any) => {
-            const dataUrl = await compressImage(file);
-            return { id: crypto.randomUUID(), dataUrl };
-          })
-        );
-        setImages(prev => [...prev, ...newImages]);
-        onClearRoute?.();
-        toast.success('Imágenes añadidas', { id: toastId });
-      } catch (error) {
-        toast.error('Error procesando imágenes', { id: toastId });
-        console.error(error);
+    if (e.target.files && e.target.files.length > 0) {
+      if (mode === 'image' && activeUpload) {
+        const file = e.target.files[0];
+        const toastId = toast.loading('Procesando imagen...');
+        try {
+          const dataUrl = await compressImage(file);
+          const { rowIndex, type } = activeUpload;
+          setImageRows(prev => {
+            const copy = [...prev];
+            if (type === 'order') {
+              copy[rowIndex] = { ...copy[rowIndex], orderImage: dataUrl };
+            } else {
+              copy[rowIndex] = { ...copy[rowIndex], financialImage: dataUrl };
+            }
+            return copy;
+          });
+          onClearRoute?.();
+          toast.success('Imagen capturada con éxito', { id: toastId });
+        } catch (error) {
+          toast.error('Error procesando imagen', { id: toastId });
+          console.error(error);
+        } finally {
+          setActiveUpload(null);
+        }
+      } else {
+        const toastId = toast.loading('Procesando imágenes...');
+        try {
+          const newImages = await Promise.all(
+            Array.from(e.target.files).map(async (file: any) => {
+              const dataUrl = await compressImage(file);
+              return { id: crypto.randomUUID(), dataUrl };
+            })
+          );
+          setImages(prev => [...prev, ...newImages]);
+          onClearRoute?.();
+          toast.success('Imágenes añadidas', { id: toastId });
+        } catch (error) {
+          toast.error('Error procesando imágenes', { id: toastId });
+          console.error(error);
+        }
       }
       // Clear input so same files can be selected again if needed
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -231,66 +292,406 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
     }
   };
 
+  const handleAddRow = () => {
+    setImageRows(prev => [...prev, { id: crypto.randomUUID(), orderImage: null, financialImage: null }]);
+  };
+
+  const handleRemoveRow = (id: string) => {
+    if (imageRows.length === 1) return;
+    setImageRows(prev => prev.filter(row => row.id !== id));
+  };
+
+  const handleClearSlot = (rowIndex: number, type: 'order' | 'finance') => {
+    setImageRows(prev => {
+      const copy = [...prev];
+      if (type === 'order') {
+        copy[rowIndex] = { ...copy[rowIndex], orderImage: null };
+      } else {
+        copy[rowIndex] = { ...copy[rowIndex], financialImage: null };
+      }
+      return copy;
+    });
+    onClearRoute?.();
+  };
+
+  const handleTriggerUpload = (rowIndex: number, type: 'order' | 'finance') => {
+    setActiveUpload({ rowIndex, type });
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleProcessImageMode = async () => {
+    const incompleteRow = imageRows.some(row => !row.orderImage || !row.financialImage);
+    if (incompleteRow) {
+      toast.error("Por favor completa las capturas para todos los pedidos agregados.");
+      return;
+    }
+
+    setIsProcessing(true);
+    let loadingToast = toast.loading('Procesando capturas y asociando datos financieros...');
+
+    try {
+      const flatImages: { mimeType: string, data: string }[] = [];
+      imageRows.forEach(row => {
+        flatImages.push({
+          mimeType: 'image/jpeg',
+          data: row.orderImage!.split(',')[1]
+        });
+        flatImages.push({
+          mimeType: 'image/jpeg',
+          data: row.financialImage!.split(',')[1]
+        });
+      });
+
+      const result = await processLogisticsData(flatImages, '', true);
+
+      toast.dismiss(loadingToast);
+      toast.success('¡Ruta generada y optimizada con éxito!');
+      onProcessed(result);
+    } catch (error: any) {
+      toast.dismiss(loadingToast);
+      const errorMessage = error.message || '';
+      console.error(error);
+      toast.error('Hubo un error al procesar las imágenes. ' + errorMessage);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (!isLoaded) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2">
-          <Upload className="w-5 h-5 text-blue-500" />
-          1. Capturas de Pedidos
-        </h2>
-        <div className="mb-4">
-          <input
-            type="file"
-            multiple
-            accept="image/*"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={handleImageChange}
-          />
+      {/* Starting State: Select Mode */}
+      {mode === null ? (
+        <div className="flex flex-col items-center justify-center py-16 px-4 space-y-6 text-center max-w-md mx-auto bg-white dark:bg-gray-800 p-8 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-sm mt-4">
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-400 shadow-md">
+            <ImageIcon className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Ingreso de Viaje</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Para iniciar un nuevo viaje de reparto, selecciona el método para ingresar la información financiera.
+            </p>
+          </div>
           <button
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 gap-2"
+            onClick={() => setShowSelectionModal(true)}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-base rounded-xl shadow-lg shadow-blue-500/20 cursor-pointer transition-all flex items-center justify-center gap-2"
           >
-            <ImagePlus className="w-8 h-8" />
-            <span className="font-medium">Haz clic para subir o toma fotos</span>
+            Iniciar nuevo viaje
           </button>
         </div>
-
-        {images.length > 0 && (
-          <div className="flex flex-col gap-2 mt-4 max-h-48 overflow-y-auto">
-            {images.map((img, index) => (
-              <div key={img.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-blue-500" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Captura {index + 1}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSelectedImage(img.dataUrl)}
-                    className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors"
-                  >
-                    <Eye className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => removeImage(img.id)}
-                    className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+      ) : mode === 'manual' ? (
+        // Manual mode flow (original upload captures + financial text)
+        <div className="space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xs">
+            <div>
+              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Ingreso del viaje</span>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <FileText className="w-5 h-5 text-blue-500" />
+                Modo de ingreso: Manual
+              </h2>
+            </div>
+            <button
+              onClick={() => {
+                setMode(null);
+                setImages([]);
+                setFinancialText('');
+                localStorage.removeItem('logiruta_input_mode');
+                localforage.removeItem('logiruta_images');
+                localforage.removeItem('logiruta_text');
+                onClearRoute?.();
+              }}
+              className="text-xs font-bold text-blue-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg flex items-center gap-1 self-start sm:self-center cursor-pointer"
+            >
+              ← Cambiar de modo
+            </button>
           </div>
-        )}
-      </div>
 
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-white flex items-center gap-2">
+              <Upload className="w-5 h-5 text-blue-500" />
+              1. Capturas de Pedidos
+            </h2>
+            <div className="mb-4">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleImageChange}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 gap-2 cursor-pointer"
+              >
+                <ImagePlus className="w-8 h-8" />
+                <span className="font-medium text-xs">Haz clic para subir o toma fotos de pedidos</span>
+              </button>
+            </div>
+
+            {images.length > 0 && (
+              <div className="flex flex-col gap-2 mt-4 max-h-48 overflow-y-auto">
+                {images.map((img, index) => (
+                  <div key={img.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-blue-500" />
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Captura {index + 1}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedImage(img.dataUrl)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => removeImage(img.id)}
+                        className="p-1.5 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-500" />
+              2. Datos Financieros
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Pega el texto con los métodos de pago, montos y TR. (Ej. 0452/$1445.50/tdc4876)
+            </p>
+            
+            <textarea
+              value={financialText}
+              onChange={handleTextChange}
+              placeholder="0452/$1445.50/tdc4876&#10;0072/$1415/tdc4904..."
+              className="w-full h-40 p-4 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none text-gray-700 dark:text-gray-200 font-mono text-sm leading-relaxed"
+            />
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setImages([]);
+                setFinancialText('');
+                localforage.removeItem('logiruta_images');
+                localforage.removeItem('logiruta_text');
+                onClearRoute?.();
+              }}
+              disabled={isProcessing || (images.length === 0 && financialText === '')}
+              className="px-5 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-900 text-gray-700 dark:text-gray-300 dark:disabled:text-gray-600 rounded-xl font-semibold text-base transition-all cursor-pointer"
+            >
+              Limpiar
+            </button>
+            <button
+              onClick={handleProcess}
+              disabled={isProcessing || images.length === 0 || !financialText.trim()}
+              className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                'Siguiente'
+              )}
+            </button>
+          </div>
+        </div>
+      ) : (
+        // Image mode flow (New! Double capture pair layout per order)
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xs">
+            <div>
+              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Ingreso del viaje</span>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <ImageIcon className="w-5 h-5 text-emerald-500" />
+                Modo de ingreso: Imagen (OCR)
+              </h2>
+            </div>
+            <button
+              onClick={() => {
+                setMode(null);
+                setImageRows([{ id: crypto.randomUUID(), orderImage: null, financialImage: null }]);
+                localStorage.removeItem('logiruta_input_mode');
+                localforage.removeItem('logiruta_image_rows');
+                onClearRoute?.();
+              }}
+              className="text-xs font-bold text-blue-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-lg flex items-center gap-1 self-start sm:self-center cursor-pointer"
+            >
+              ← Cambiar de modo
+            </button>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-xs space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Capturas por Pedido</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Sube la captura de datos (1) y la captura financiera (2) para cada pedido. Gemini extraerá y relacionará automáticamente los montos y TR según el tipo de pago.
+              </p>
+            </div>
+
+            {/* Hidden Single Reusable File Input */}
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleImageChange}
+            />
+
+            <div className="space-y-4">
+              {imageRows.map((row, idx) => (
+                <div key={row.id} className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-2xl">
+                  <div className="flex items-center justify-between w-full sm:w-auto gap-2 shrink-0">
+                    <span className="text-sm font-bold text-gray-700 dark:text-white bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-1.5 rounded-xl shadow-xs">
+                      Pedido {idx + 1}
+                    </span>
+                    {imageRows.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveRow(row.id)}
+                        className="sm:hidden p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 flex-1 w-full">
+                    {/* Slot 1: Pedido Capture */}
+                    <div className="relative">
+                      {row.orderImage ? (
+                        <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 flex flex-col justify-between p-2">
+                          <img src={row.orderImage} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                          <div className="relative z-10 flex justify-between items-start w-full">
+                            <span className="text-[10px] bg-green-500 text-white font-bold px-1.5 py-0.5 rounded-full shadow-sm">Pedido listo</span>
+                            <button
+                              onClick={() => handleClearSlot(idx, 'order')}
+                              className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-sm cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => setSelectedImage(row.orderImage!)}
+                            className="relative z-10 w-full py-1 text-center bg-black/60 hover:bg-black/80 rounded-md text-[10px] font-bold text-white uppercase backdrop-blur-xs tracking-wider cursor-pointer"
+                          >
+                            Ver grande
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleTriggerUpload(idx, 'order')}
+                          className="w-full aspect-[4/3] border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 rounded-xl flex flex-col items-center justify-center text-gray-500 gap-1.5 p-2 cursor-pointer"
+                        >
+                          <ImagePlus className="w-5 h-5 text-gray-400" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-center">1. Captura Pedido</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Slot 2: Financial Capture */}
+                    <div className="relative">
+                      {row.financialImage ? (
+                        <div className="relative aspect-[4/3] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 flex flex-col justify-between p-2">
+                          <img src={row.financialImage} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                          <div className="relative z-10 flex justify-between items-start w-full">
+                            <span className="text-[10px] bg-sky-500 text-white font-bold px-1.5 py-0.5 rounded-full shadow-sm">Método listo</span>
+                            <button
+                              onClick={() => handleClearSlot(idx, 'finance')}
+                              className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-sm cursor-pointer"
+                              title="Eliminar"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <button
+                            onClick={() => setSelectedImage(row.financialImage!)}
+                            className="relative z-10 w-full py-1 text-center bg-black/60 hover:bg-black/80 rounded-md text-[10px] font-bold text-white uppercase backdrop-blur-xs tracking-wider cursor-pointer"
+                          >
+                            Ver grande
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleTriggerUpload(idx, 'finance')}
+                          className="w-full aspect-[4/3] border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 rounded-xl flex flex-col items-center justify-center text-gray-500 gap-1.5 p-2 cursor-pointer"
+                        >
+                          <ImagePlus className="w-5 h-5 text-gray-400" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-center">2. Captura Método</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {imageRows.length > 1 && (
+                    <button
+                      onClick={() => handleRemoveRow(row.id)}
+                      className="hidden sm:block p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-xl transition-all self-center shrink-0 cursor-pointer"
+                      title="Eliminar Pedido"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleAddRow}
+              className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 text-gray-600 dark:text-gray-300 hover:text-blue-500 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 mt-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              Agregar siguiente pedido
+            </button>
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                setImageRows([{ id: crypto.randomUUID(), orderImage: null, financialImage: null }]);
+                localforage.removeItem('logiruta_image_rows');
+                onClearRoute?.();
+              }}
+              disabled={isProcessing || !imageRows.some(row => row.orderImage || row.financialImage)}
+              className="px-5 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-900 text-gray-700 dark:text-gray-300 dark:disabled:text-gray-600 rounded-xl font-semibold text-base transition-all cursor-pointer"
+            >
+              Limpiar
+            </button>
+            <button
+              onClick={handleProcessImageMode}
+              disabled={isProcessing || imageRows.some(row => !row.orderImage || !row.financialImage)}
+              className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                'Procesar fotos de viaje'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Large Image View Modal */}
       {selectedImage && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
           <button 
             onClick={() => setSelectedImage(null)}
-            className="absolute top-4 right-4 z-10 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+            className="absolute top-4 right-4 z-10 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors cursor-pointer"
           >
             <X className="w-6 h-6" />
           </button>
@@ -303,53 +704,46 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200 flex items-center gap-2">
-          <FileText className="w-5 h-5 text-amber-500" />
-          2. Datos Financieros
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Pega el texto con los métodos de pago, montos y TR. (Ej. 0452/$1445.50/tdc4876)
-        </p>
-        
-        <textarea
-          value={financialText}
-          onChange={handleTextChange}
-          placeholder="0452/$1445.50/tdc4876&#10;0072/$1415/tdc4904..."
-          className="w-full h-40 p-4 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none text-gray-700 dark:text-gray-200 font-mono text-sm leading-relaxed"
-        />
-      </div>
+      {/* Mode Selection Modal */}
+      {showSelectionModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200">
+            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-5 text-center leading-tight">
+              Seleccióna el modo de ingreso de métodos
+            </h3>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setMode('manual');
+                  setShowSelectionModal(false);
+                }}
+                className="w-full py-4 px-4 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-2xl font-bold text-sm transition-all border border-blue-100 dark:border-blue-900/50 flex flex-col items-center justify-center gap-1 cursor-pointer"
+              >
+                <span className="text-base font-bold">Manual</span>
+                <span className="text-[10px] font-normal text-blue-600 dark:text-blue-400">Capturas del pedido + Texto financiero de soporte</span>
+              </button>
 
-      <div className="flex gap-4">
-        <button
-          onClick={() => {
-            setImages([]);
-            setFinancialText('');
-            localforage.removeItem('logiruta_images');
-            localforage.removeItem('logiruta_text');
-            onClearRoute?.();
-          }}
-          disabled={isProcessing || (images.length === 0 && financialText === '')}
-          className="px-5 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-100 dark:disabled:bg-gray-900 text-gray-700 dark:text-gray-300 dark:disabled:text-gray-600 rounded-xl font-semibold text-base transition-all"
-        >
-          Limpiar
-        </button>
-        <button
-          onClick={handleProcess}
-          disabled={isProcessing || images.length === 0 || !financialText.trim()}
-          className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-xl font-bold text-base shadow-md transition-all flex items-center justify-center gap-2"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="w-6 h-6 animate-spin" />
-              Procesando...
-            </>
-          ) : (
-            'Siguiente'
-          )}
-        </button>
-      </div>
-
+              <button
+                onClick={() => {
+                  setMode('image');
+                  setShowSelectionModal(false);
+                }}
+                className="w-full py-4 px-4 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 rounded-2xl font-bold text-xs transition-all border border-emerald-100 dark:border-emerald-900/50 flex flex-col items-center justify-center gap-1 cursor-pointer"
+              >
+                <span className="text-base font-bold">Imagen</span>
+                <span className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400">Captura del pedido + Foto de estado financiero</span>
+              </button>
+              
+              <button
+                onClick={() => setShowSelectionModal(false)}
+                className="w-full mt-2 py-3 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/40 dark:hover:bg-gray-900/60 text-gray-500 dark:text-gray-400 rounded-xl font-bold text-xs transition-all cursor-pointer text-center"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mismatch Warning Modal */}
       {showMismatchModal && mismatchData && (
@@ -362,7 +756,7 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
               </h3>
               <button 
                 onClick={() => setShowMismatchModal(false)} 
-                className="p-1 px-2.5 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold rounded-lg transition-colors"
+                className="p-1 px-2.5 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold rounded-lg transition-colors cursor-pointer"
               >
                 Cerrar
               </button>
@@ -421,7 +815,7 @@ export function InputView({ onProcessed, existingRouteInfo, onClearRoute }: Inpu
             <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 flex justify-end">
               <button 
                 onClick={() => setShowMismatchModal(false)}
-                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-md focus:outline-none"
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-md focus:outline-none cursor-pointer"
               >
                 Corregir mis datos
               </button>

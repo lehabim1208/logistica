@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { X, SwitchCamera, Circle, Clock, MapPin, CalendarDays } from 'lucide-react';
+import { X, SwitchCamera, Circle, Clock, MapPin, CalendarDays, Zap, ZapOff, Flashlight } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CameraWatermarkModalProps {
@@ -87,6 +87,7 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
 
   const [cameraError, setCameraError] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [torchMode, setTorchMode] = useState<'off' | 'on' | 'flash'>('off');
 
   // Camera handling
   const startCamera = useCallback(async () => {
@@ -120,11 +121,42 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
     };
   }, [facingMode]); // Intentionally not restarting on every render
 
+  // Apply torch constraints when stream or torchMode changes
+  useEffect(() => {
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+
+    const applyTorch = async () => {
+      try {
+        const capabilities = track.getCapabilities() as any;
+        if (capabilities && 'torch' in capabilities) {
+          await track.applyConstraints({
+            advanced: [{ torch: torchMode === 'on' } as any]
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to apply torch constraints:', e);
+      }
+    };
+
+    const t = setTimeout(applyTorch, 400); // Small delay to let stream configure
+    return () => clearTimeout(t);
+  }, [stream, torchMode]);
+
+  const toggleTorchMode = () => {
+    setTorchMode(prev => {
+      if (prev === 'off') return 'flash';
+      if (prev === 'flash') return 'on';
+      return 'off';
+    });
+  };
+
   const toggleCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
-  const takePhoto = () => {
+  const takePhoto = async () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -132,6 +164,26 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
     if (video.readyState < 2 || video.videoWidth === 0) {
        toast.error("La cámara aún se está inicializando, espera un momento...");
        return;
+    }
+
+    let trackToRestore: MediaStreamTrack | null = null;
+    if (torchMode === 'flash' && stream) {
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        try {
+          const capabilities = track.getCapabilities() as any;
+          if (capabilities && 'torch' in capabilities) {
+            await track.applyConstraints({
+              advanced: [{ torch: true } as any]
+            });
+            trackToRestore = track;
+            // Espera a que el flash del dispositivo se estabilice
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
+        } catch (e) {
+          console.warn("Flash setup failed:", e);
+        }
+      }
     }
 
     const ctx = canvas.getContext('2d');
@@ -280,6 +332,16 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
       setTimeout(() => setFlash(false), 200);
       onCapture(dataUrl);
     }
+
+    if (trackToRestore) {
+      try {
+        await trackToRestore.applyConstraints({
+          advanced: [{ torch: false } as any]
+        });
+      } catch (e) {
+        console.warn("Restoring torch failed:", e);
+      }
+    }
   };
 
   return (
@@ -367,17 +429,32 @@ export function CameraWatermarkModal({ onClose, onCapture }: CameraWatermarkModa
       </div>
 
       <div className="h-32 shrink-0 bg-black flex justify-center items-center gap-12 pb-safe-offset-4">
-        <div className="w-12 h-12" /> {/* Spacer */}
+        <button 
+          onClick={toggleTorchMode}
+          className="w-12 h-12 bg-white/10 rounded-full flex flex-col items-center justify-center text-white hover:bg-white/20 transition relative shrink-0 cursor-pointer border border-white/10"
+          title="Modo de Flash/Luz"
+        >
+          {torchMode === 'off' && <ZapOff className="w-5 h-5 text-gray-400" />}
+          {torchMode === 'on' && <Flashlight className="w-5 h-5 text-yellow-400 animate-pulse" />}
+          {torchMode === 'flash' && <Zap className="w-5 h-5 text-blue-400" />}
+          <span className="text-[8px] font-extrabold uppercase mt-0.5 leading-none tracking-tighter">
+            {torchMode === 'off' && 'Off'}
+            {torchMode === 'on' && 'Fija'}
+            {torchMode === 'flash' && 'Flash'}
+          </span>
+        </button>
+
         <button 
           onClick={takePhoto}
           disabled={cameraError}
-          className="w-20 h-20 bg-white/30 rounded-full flex items-center justify-center border-4 border-white hover:bg-white/50 transition-colors disabled:opacity-50"
+          className="w-20 h-20 bg-white/30 rounded-full flex items-center justify-center border-4 border-white hover:bg-white/50 transition-colors disabled:opacity-50 shrink-0"
         >
           <Circle className="w-16 h-16 text-white fill-white" />
         </button>
+
         <button 
           onClick={toggleCamera}
-          className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition"
+          className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition shrink-0"
         >
           <SwitchCamera className="w-6 h-6" />
         </button>

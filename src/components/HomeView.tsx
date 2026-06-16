@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn, DollarSign, CreditCard, History, StickyNote } from 'lucide-react';
+import { LogIn, DollarSign, CreditCard, History, StickyNote, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 
@@ -7,9 +7,10 @@ interface HomeViewProps {
   onStartShift: (fund: number, tpv: string, startTime: string, endTime: string) => void;
   onViewHistory?: () => void;
   onViewNotes?: () => void;
+  onOpenCamera?: () => void;
 }
 
-export function HomeView({ onStartShift, onViewHistory, onViewNotes }: HomeViewProps) {
+export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamera }: HomeViewProps) {
   const [showFundInput, setShowFundInput] = useState(false);
   const [fundAmount, setFundAmount] = useState('');
   const [tpvNumber, setTpvNumber] = useState('');
@@ -172,14 +173,14 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes }: HomeViewP
         </AnimatePresence>
 
         {!showFundInput && (
-          <div className="w-full flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center items-center pt-2">
+          <div className="w-full flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center items-center pt-2 flex-wrap">
             {onViewHistory && (
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8 }}
                 onClick={onViewHistory}
-                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[180px]"
+                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[150px]"
               >
                 <History className="w-4 h-4" />
                 <span>Historial de rutas</span>
@@ -189,12 +190,24 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes }: HomeViewP
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.9 }}
+                transition={{ delay: 0.85 }}
                 onClick={onViewNotes}
-                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[180px]"
+                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[150px]"
               >
                 <StickyNote className="w-4 h-4" />
                 <span>Ver Notas Rápidas</span>
+              </motion.button>
+            )}
+            {onOpenCamera && (
+              <motion.button
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9 }}
+                onClick={onOpenCamera}
+                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[150px]"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Cámara de Agua</span>
               </motion.button>
             )}
           </div>
