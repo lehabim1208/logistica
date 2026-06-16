@@ -282,11 +282,11 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
     const shortName = getShortName(order.clientName || 'Cliente');
     let text = "";
     if (msgIndex === 1) {
-      text = `Hola ${shortName}, ${greeting} 🙋🏻‍♂️\nSoy el repartidor asignado de *Walmart* .\nMe comunico con usted para informarle que acabo de iniciar mi ruta de entrega de pedidos. Me comunico más tarde con usted cuando me dirija a su domicilio. 📦`;
+      text = `Hola ${shortName}, ${greeting}. Soy el repartidor asignado de Walmart 🙋\nMe comunico con usted para informarle que acabo de iniciar mi ruta de entrega. Le avisaré más tarde en cuanto me dirija a su domicilio 📦`;
     } else if (msgIndex === 2) {
-      text = `Hola ${shortName}, ${greeting}. Me comunico de Walmart. Soy el repartidor asignado, traigo su pedido. Me encuentro ya en el punto que me marca el GPS 📍`;
+      text = `Hola, ${greeting}. Me comunico de Walmart. Soy el repartidor asignado, traigo su pedido. Me encuentro ya en el punto que me marca el GPS 📍`;
     } else if (msgIndex === 3) {
-      text = `Hola ${shortName}, ${greeting}. Me comunico de Walmart. Llevo su pedido. ¿Me podría compartir su ubicación por favor?`;
+      text = `Hola, ${greeting}. Me comunico de Walmart. Llevo su pedido. ¿Me podría compartir su ubicación por favor?`;
     }
     
     const phoneStr = String(order.phone || '');
@@ -815,21 +815,21 @@ export function DeliveryView({ routeInfo, currentIndex, onNext, onFinish, onCanc
             <div className="p-4 space-y-3">
               <button 
                 onClick={() => sendWhatsApp(1)}
-                className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-xs text-gray-700 dark:text-gray-300"
               >
-                "🙋🏻‍♂️ Hola [Nombre], [buenas tardes]. Soy el repartidor asignado..."
+                "🙋 Hola [Nombre y Apellido], [saludo]. Soy el repartidor asignado de Walmart..."
               </button>
               <button 
                 onClick={() => sendWhatsApp(2)}
-                className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-xs text-gray-700 dark:text-gray-300"
               >
-                "📍 Hola [Nombre], [buenas tardes]. Me encuentro ya en el punto..."
+                "📍 Hola, [saludo]. Me encuentro ya en el punto..."
               </button>
               <button 
                 onClick={() => sendWhatsApp(3)}
-                className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm text-gray-700 dark:text-gray-300"
+                className="w-full p-3 text-left border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-xs text-gray-700 dark:text-gray-300"
               >
-                "📱 Hola [Nombre], [buenas tardes]. ¿Me podría compartir su ubicación?"
+                "✉️ Hola, [saludo]. ¿Me podría compartir su ubicación por favor?"
               </button>
             </div>
           </div>
