@@ -54,27 +54,27 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[85vh] px-4 overflow-hidden">
-      <div className={`w-full max-w-md flex flex-col items-center text-center ${showFundInput ? 'space-y-5' : 'space-y-12'}`}>
+    <div className="flex flex-col items-center justify-center min-h-[65vh] py-8 px-4 overflow-hidden">
+      <div className={`w-full max-w-sm flex flex-col items-center text-center ${showFundInput ? 'space-y-4' : 'space-y-8'}`}>
         
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className={showFundInput ? 'space-y-2' : 'space-y-4'}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className={showFundInput ? 'space-y-1' : 'space-y-3'}
         >
           <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className={`bg-blue-600 rounded-3xl mx-auto flex items-center justify-center text-white shadow-2xl shadow-blue-500/30 ${showFundInput ? 'w-14 h-14 mb-2' : 'w-20 h-20 mb-6'}`}
+            transition={{ delay: 0.15, duration: 0.4 }}
+            className={`bg-blue-600 rounded-2xl mx-auto flex items-center justify-center text-white shadow-xl shadow-blue-500/20 ${showFundInput ? 'w-12 h-12 mb-1.5' : 'w-16 h-16 mb-4'}`}
           >
-            <LogIn className={showFundInput ? 'w-7 h-7' : 'w-10 h-10'} />
+            <LogIn className={showFundInput ? 'w-6 h-6' : 'w-8 h-8'} />
           </motion.div>
-          <h1 className={`font-bold text-gray-900 dark:text-white tracking-tight leading-tight ${showFundInput ? 'text-2xl sm:text-3xl' : 'text-4xl sm:text-5xl'}`}>
+          <h1 className={`font-bold text-gray-900 dark:text-white tracking-tight leading-tight ${showFundInput ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl'}`}>
             {greeting}
           </h1>
-          <p className={`text-gray-500 dark:text-gray-400 font-medium ${showFundInput ? 'text-sm' : 'text-lg sm:text-xl'}`}>
+          <p className={`text-gray-500 dark:text-gray-400 font-semibold ${showFundInput ? 'text-xs' : 'text-sm sm:text-base'}`}>
             ¿Listo para comenzar la jornada?
           </p>
         </motion.div>
@@ -83,16 +83,16 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
           {!showFundInput ? (
             <motion.button
               key="start-button"
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              exit={{ opacity: 0, scale: 0.92 }}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
               onClick={handleStartShift}
-              className="w-full py-5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold text-xl shadow-2xl shadow-gray-500/20 dark:shadow-white/5 transition-all flex items-center justify-center gap-3 group cursor-pointer"
+              className="w-full py-3.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl font-bold text-base shadow-xl shadow-gray-500/10 dark:shadow-white/5 transition-all flex items-center justify-center gap-2 group cursor-pointer"
             >
               <span>Iniciar jornada</span>
-              <LogIn className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+              <LogIn className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </motion.button>
           ) : (
             <motion.div 
@@ -129,11 +129,13 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
                       <CreditCard className="h-4 w-4 text-gray-300 dark:text-gray-600 group-focus-within:text-blue-500 transition-colors" />
                     </div>
                     <input
-                      type="text"
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={tpvNumber}
                       onChange={(e) => setTpvNumber(e.target.value)}
                       placeholder="Ej. 69"
-                      className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:border-blue-500 rounded-xl outline-none font-bold text-xs text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-gray-700 transition-all"
+                      className="w-full pl-9 pr-3 py-2 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 focus:border-blue-500 rounded-xl outline-none font-bold text-xs text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-gray-700 transition-all [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [appearance:textfield]"
                     />
                   </div>
                 </div>
@@ -173,16 +175,16 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
         </AnimatePresence>
 
         {!showFundInput && (
-          <div className="w-full flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center items-center pt-2 flex-wrap">
+          <div className="w-full flex flex-col gap-2 justify-center items-center pt-4 max-w-[280px] mx-auto">
             {onViewHistory && (
               <motion.button
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8 }}
                 onClick={onViewHistory}
-                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[150px]"
+                className="py-2.5 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-all flex justify-center items-center gap-2 text-xs font-bold border border-dashed border-gray-200 dark:border-gray-700/80 hover:border-solid hover:border-blue-500 rounded-xl w-full"
               >
-                <History className="w-4 h-4" />
+                <History className="w-3.5 h-3.5" />
                 <span>Historial de rutas</span>
               </motion.button>
             )}
@@ -192,9 +194,9 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.85 }}
                 onClick={onViewNotes}
-                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[150px]"
+                className="py-2.5 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-all flex justify-center items-center gap-2 text-xs font-bold border border-dashed border-gray-200 dark:border-gray-700/80 hover:border-solid hover:border-blue-500 rounded-xl w-full"
               >
-                <StickyNote className="w-4 h-4" />
+                <StickyNote className="w-3.5 h-3.5" />
                 <span>Ver Notas Rápidas</span>
               </motion.button>
             )}
@@ -204,9 +206,9 @@ export function HomeView({ onStartShift, onViewHistory, onViewNotes, onOpenCamer
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.9 }}
                 onClick={onOpenCamera}
-                className="py-3 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors flex justify-center items-center gap-2 text-sm font-semibold border border-dashed border-gray-200 dark:border-gray-700 hover:border-solid hover:border-blue-500 rounded-xl w-full sm:w-auto min-w-[150px]"
+                className="py-2.5 px-4 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-all flex justify-center items-center gap-2 text-xs font-bold border border-dashed border-gray-200 dark:border-gray-700/80 hover:border-solid hover:border-blue-500 rounded-xl w-full text-center"
               >
-                <Camera className="w-4 h-4" />
+                <Camera className="w-3.5 h-3.5" />
                 <span>Cámara de Agua</span>
               </motion.button>
             )}
